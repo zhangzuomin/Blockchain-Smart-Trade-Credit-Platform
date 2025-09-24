@@ -1,0 +1,3495 @@
+1. 贸易看板源代码
+<!doctype html>
+<html lang="zh-CN">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>区块链智能贸易信用平台 - 贸易看板</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://jsd.onmicrosoft.cn/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+        :root {
+            --primary-color: #D3C3DB;
+            --dark-blue: #0F172A;
+            --data-blue: #3B82F6;
+            --credit-green: #10B981;
+            --text-white: #FFFFFF;
+            --text-light: #F3F4F6;
+        }
+        body {
+            background: linear-gradient(135deg, var(--dark-blue) 0%, #1E293B 100%);
+            color: var(--text-white);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(8px);
+            border: 1px solid;
+            border-image: linear-gradient(45deg, var(--primary-color), var(--data-blue)) 1;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 
+                        0 0 20px rgba(211, 195, 219, 0.1),
+                        inset 0 0 15px rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2), 
+                        0 0 25px rgba(211, 195, 219, 0.15),
+                        inset 0 0 20px rgba(255, 255, 255, 0.08);
+        }
+        .main-title {
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(90deg, var(--primary-color), var(--data-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .data-label {
+            font-weight: 500;
+            letter-spacing: 0.03em;
+            color: var(--text-light);
+        }
+        .blockchain-data {
+            font-family: 'Monospace', monospace;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        .filter-bar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(211, 195, 219, 0.2);
+        }
+        .filter-option {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .filter-option::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+            transition: left 0.5s ease;
+        }
+        .filter-option:hover::before {
+            left: 100%;
+        }
+        .chart-container {
+            transition: transform 0.3s ease;
+        }
+        .chart-container:hover {
+            transform: scale(1.02);
+        }
+        .metric-card {
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        }
+        .metric-card:active {
+            transform: scale(0.98);
+        }
+        .dialog {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(16px);
+            border: 1px solid;
+            border-image: linear-gradient(45deg, var(--primary-color), var(--data-blue)) 1;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 90%;
+        }
+        .dialog-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 999;
+        }
+        .drilldown-btn {
+            background: linear-gradient(90deg, var(--primary-color), var(--data-blue));
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .drilldown-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+    </style>
+ </head>
+ <body class="min-h-screen">
+  <!-- 时间筛选栏 -->
+  <div class="filter-bar py-4 px-6">
+   <div class="flex items-center justify-between max-w-7xl mx-auto">
+    <h1 class="main-title text-2xl">贸易看板</h1>
+    <div class="flex space-x-4" id="timeFilter">
+     <button class="filter-option px-4 py-2 rounded-lg glass-card text-sm" data-range="7">近7天</button> <button class="filter-option px-4 py-2 rounded-lg glass-card text-sm" data-range="30">近30天</button> <button class="filter-option px-4 py-2 rounded-lg glass-card text-sm" data-range="90">近90天</button> <button class="filter-option px-4 py-2 rounded-lg glass-card text-sm" id="customRangeBtn">自定义</button>
+    </div>
+   </div>
+  </div> <!-- 主内容区域 -->
+  <main class="container mx-auto px-4 py-8 max-w-7xl" style="max-width: 100% !important; padding: 5px !important;">
+   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" id="summaryMetrics">
+    <!-- 交易金额 -->
+    <div class="glass-card p-6 metric-card" id="tradeAmountCard">
+     <h3 class="data-label text-sm mb-2">交易金额</h3>
+     <p class="text-2xl font-bold">¥3,847.26万</p>
+     <p class="text-xs mt-1 flex items-center"><span class="text-green-500">↑12.3%</span> <span class="ml-2">较上月</span></p>
+    </div> <!-- 订单数量 -->
+    <div class="glass-card p-6 metric-card" id="orderCountCard">
+     <h3 class="data-label text-sm mb-2">订单数量</h3>
+     <p class="text-2xl font-bold">2,847</p>
+     <p class="text-xs mt-1 flex items-center"><span class="text-green-500">↑8.7%</span> <span class="ml-2">较上月</span></p>
+    </div> <!-- 参与企业 -->
+    <div class="glass-card p-6 metric-card" id="enterpriseCard">
+     <h3 class="data-label text-sm mb-2">参与企业</h3>
+     <p class="text-2xl font-bold">184</p>
+     <p class="text-xs mt-1 flex items-center"><span class="text-green-500">↑5.2%</span> <span class="ml-2">较上月</span></p>
+    </div> <!-- 平均信用分 -->
+    <div class="glass-card p-6 metric-card" id="creditScoreCard">
+     <h3 class="data-label text-sm mb-2">平均信用分</h3>
+     <p class="text-2xl font-bold">87.6</p>
+     <p class="text-xs mt-1 flex items-center"><span class="text-green-500">↑2.4</span> <span class="ml-2">较上月</span></p>
+    </div>
+   </div>
+   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- 贸易总量图表 -->
+    <div class="glass-card p-6 col-span-1" id="tradeVolumeChartContainer">
+     <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-semibold">贸易总量趋势</h2> <button class="drilldown-btn text-sm" id="tradeVolumeDrilldown">下钻分析</button>
+     </div>
+     <div id="tradeVolumeChart" style="height: 300px;"></div>
+    </div> <!-- 信用评分分布 -->
+    <div class="glass-card p-6 col-span-1" id="creditDistributionContainer">
+     <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-semibold">信用评分分布</h2> <button class="drilldown-btn text-sm" id="creditDistributionDrilldown">查看详情</button>
+     </div>
+     <div class="grid grid-cols-5 gap-2 mb-4">
+      <div class="text-center">
+       <div class="h-4 rounded-full bg-red-500 mx-auto"></div>
+       <p class="text-xs mt-1">0-60</p>
+      </div>
+      <div class="text-center">
+       <div class="h-4 rounded-full bg-orange-500 mx-auto"></div>
+       <p class="text-xs mt-1">61-70</p>
+      </div>
+      <div class="text-center">
+       <div class="h-4 rounded-full bg-yellow-500 mx-auto"></div>
+       <p class="text-xs mt-1">71-80</p>
+      </div>
+      <div class="text-center">
+       <div class="h-4 rounded-full bg-blue-500 mx-auto"></div>
+       <p class="text-xs mt-1">81-90</p>
+      </div>
+      <div class="text-center">
+       <div class="h-4 rounded-full bg-green-500 mx-auto"></div>
+       <p class="text-xs mt-1">91-100</p>
+      </div>
+     </div>
+     <div id="creditDistributionChart" style="height: 250px;"></div>
+    </div>
+   </div>
+   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- 智能合约监控 -->
+    <div class="glass-card p-6" id="contractMonitorContainer">
+     <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-semibold">智能合约监控</h2> <button class="drilldown-btn text-sm" id="contractMonitorDrilldown">告警详情</button>
+     </div>
+     <div class="grid grid-cols-3 gap-4 mb-4">
+      <div class="text-center p-3 glass-card">
+       <p class="text-2xl font-bold">147</p>
+       <p class="text-xs">部署数量</p>
+      </div>
+      <div class="text-center p-3 glass-card">
+       <p class="text-2xl font-bold">8,742</p>
+       <p class="text-xs">调用次数</p>
+      </div>
+      <div class="text-center p-3 glass-card bg-red-500 bg-opacity-20" id="alertCountCard">
+       <p class="text-2xl font-bold">3</p>
+       <p class="text-xs">异常告警</p>
+      </div>
+     </div>
+     <div id="contractMonitorChart" style="height: 250px;"></div>
+    </div> <!-- 区块链网络健康度 -->
+    <div class="glass-card p-6" id="blockchainHealthContainer">
+     <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-semibold">区块链网络健康度</h2> <button class="drilldown-btn text-sm" id="blockchainHealthDrilldown">节点详情</button>
+     </div>
+     <div class="grid grid-cols-3 gap-4 mb-4">
+      <div class="text-center p-3 glass-card">
+       <p class="text-2xl font-bold">24</p>
+       <p class="text-xs">节点数量</p>
+      </div>
+      <div class="text-center p-3 glass-card">
+       <p class="blockchain-data text-2xl font-bold">847,362</p>
+       <p class="text-xs">区块高度</p>
+      </div>
+      <div class="text-center p-3 glass-card">
+       <p class="text-2xl font-bold">2.4s</p>
+       <p class="text-xs">确认时间</p>
+      </div>
+     </div>
+     <div id="blockchainHealthChart" style="height: 250px;"></div>
+    </div>
+   </div> <!-- 企业信用排行榜 -->
+   <div class="glass-card p-6 mb-8" id="creditRankingContainer">
+    <h2 class="text-lg font-semibold mb-4">企业信用排行榜</h2>
+    <div class="overflow-x-auto">
+     <table class="w-full">
+      <thead>
+       <tr class="border-b border-gray-700">
+        <th class="text-left py-2">排名</th>
+        <th class="text-left py-2">企业名称</th>
+        <th class="text-left py-2">信用评分</th>
+        <th class="text-left py-2">交易金额</th>
+        <th class="text-left py-2">操作</th>
+       </tr>
+      </thead>
+      <tbody>
+       <tr class="border-b border-gray-800">
+        <td class="py-3">1</td>
+        <td class="py-3">环球贸易有限公司</td>
+        <td class="py-3">98.7</td>
+        <td class="py-3">¥842万</td>
+        <td class="py-3"><button class="text-blue-400 hover:text-blue-300 text-sm" id="viewEnterprise1">查看详情</button></td>
+       </tr>
+       <tr class="border-b border-gray-800">
+        <td class="py-3">2</td>
+        <td class="py-3">创新科技集团</td>
+        <td class="py-3">96.3</td>
+        <td class="py-3">¥736万</td>
+        <td class="py-3"><button class="text-blue-400 hover:text-blue-300 text-sm" id="viewEnterprise2">查看详情</button></td>
+       </tr>
+       <tr class="border-b border-gray-800">
+        <td class="py-3">3</td>
+        <td class="py-3">绿色能源股份</td>
+        <td class="py-3">94.8</td>
+        <td class="py-3">¥658万</td>
+        <td class="py-3"><button class="text-blue-400 hover:text-blue-300 text-sm" id="viewEnterprise3">查看详情</button></td>
+       </tr>
+       <tr class="border-b border-gray-800">
+        <td class="py-3">4</td>
+        <td class="py-3">智慧物流国际</td>
+        <td class="py-3">92.1</td>
+        <td class="py-3">¥547万</td>
+        <td class="py-3"><button class="text-blue-400 hover:text-blue-300 text-sm" id="viewEnterprise4">查看详情</button></td>
+       </tr>
+       <tr>
+        <td class="py-3">5</td>
+        <td class="py-3">数字金融解决方案</td>
+        <td class="py-3">90.5</td>
+        <td class="py-3">¥432万</td>
+        <td class="py-3"><button class="text-blue-400 hover:text-blue-300 text-sm" id="viewEnterprise5">查看详情</button></td>
+       </tr>
+      </tbody>
+     </table>
+    </div>
+   </div>
+  </main> <!-- 对话框 -->
+  <div class="dialog-overlay" id="dialogOverlay"></div>
+  <div class="dialog" id="timeRangeDialog">
+   <h3 class="text-lg font-semibold mb-4">自定义时间范围</h3>
+   <div class="grid grid-cols-2 gap-4 mb-4">
+    <div>
+     <label class="block text-sm mb-2">开始日期</label> <input type="date" class="w-full p-2 rounded-lg bg-gray-800 border border-gray-700" id="startDate">
+    </div>
+    <div>
+     <label class="block text-sm mb-2">结束日期</label> <input type="date" class="w-full p-2 rounded-lg bg-gray-800 border border-gray-700" id="endDate">
+    </div>
+   </div>
+   <div class="flex justify-end space-x-3">
+    <button class="px-4 py-2 rounded-lg border border-gray-600 hover:bg-gray-700" id="cancelTimeRange">取消</button> <button class="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600" id="applyTimeRange">应用</button>
+   </div>
+  </div>
+  <div class="dialog" id="enterpriseDetailDialog">
+   <h3 class="text-lg font-semibold mb-4" id="dialogEnterpriseName">企业详情</h3>
+   <div class="grid grid-cols-2 gap-4 mb-4">
+    <div>
+     <p class="text-sm text-gray-400">信用评分</p>
+     <p class="text-xl font-bold" id="dialogCreditScore">-</p>
+    </div>
+    <div>
+     <p class="text-sm text-gray-400">交易总额</p>
+     <p class="text-xl font-bold" id="dialogTradeAmount">-</p>
+    </div>
+    <div>
+     <p class="text-sm text-gray-400">订单数量</p>
+     <p class="text-xl font-bold" id="dialogOrderCount">-</p>
+    </div>
+    <div>
+     <p class="text-sm text-gray-400">合约执行率</p>
+     <p class="text-xl font-bold" id="dialogContractRate">-</p>
+    </div>
+   </div>
+   <div class="mb-4">
+    <p class="text-sm text-gray-400 mb-2">信用评估摘要</p>
+    <p class="text-sm" id="dialogCreditSummary">暂无评估数据</p>
+   </div> <button class="w-full py-2 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600" id="closeEnterpriseDialog">关闭</button>
+  </div>
+  <div class="dialog" id="alertDetailDialog">
+   <h3 class="text-lg font-semibold mb-4">智能合约告警详情</h3>
+   <div class="space-y-3 mb-4">
+    <div class="p-3 rounded-lg bg-red-500 bg-opacity-20">
+     <p class="font-medium">合约执行超时</p>
+     <p class="text-sm">合约ID: CT20250328001 • 时间: 2025-03-28 10:23:45</p>
+    </div>
+    <div class="p-3 rounded-lg bg-red-500 bg-opacity-20">
+     <p class="font-medium">数据验证失败</p>
+     <p class="text-sm">合约ID: CT20250327045 • 时间: 2025-03-27 16:12:33</p>
+    </div>
+    <div class="p-3 rounded-lg bg-red-500 bg-opacity-20">
+     <p class="font-medium">节点同步异常</p>
+     <p class="text-sm">节点: Node-12 • 时间: 2025-03-26 08:45:21</p>
+    </div>
+   </div> <button class="w-full py-2 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600" id="closeAlertDialog">关闭</button>
+  </div>
+  <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const tradeVolumeChart = echarts.init(document.getElementById('tradeVolumeChart'));
+            tradeVolumeChart.setOption({
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'shadow'
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: ['3/1', '3/5', '3/10', '3/15', '3/20', '3/25', '3/28'],
+                    axisLine: {
+                        lineStyle: {
+                            color: 'rgba(255, 255, 255, 0.3)'
+                        }
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLine: {
+                        lineStyle: {
+                            color: 'rgba(255, 255, 255, 0.3)'
+                        }
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    }
+                }
+            }
+        }
+        </html>
+        </body>
+2. 智能合约源代码
+<!doctype html>
+<html lang="zh-CN">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能合约管理中心 - 区块链智能贸易信用平台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://jsd.onmicrosoft.cn/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+  <style>
+        :root {
+            --primary-color: #D3C3DB;
+            --secondary-color: #2E3A59;
+            --accent-green: #10B981;
+            --accent-red: #EF4444;
+            --text-dark: #1F2937;
+            --text-light: #6B7280;
+            --gradient-start: #D3C3DB;
+            --gradient-end: #E6D9E6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%);
+            color: var(--text-dark);
+            line-height: 1.6;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(211, 195, 219, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 14px rgba(0, 0, 0, 0.1), 0 3px 6px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(211, 195, 219, 0.4);
+        }
+        .tab-container {
+            display: flex;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .tab.active {
+            border-bottom: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .code-editor {
+            background: #282c34;
+            color: #abb2bf;
+            border-radius: 6px;
+            padding: 15px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            height: 300px;
+            overflow: auto;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow: auto;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--text-light);
+        }
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        .alert-success {
+            background-color: rgba(16, 185, 129, 0.1);
+            border-left: 4px solid var(--accent-green);
+            color: var(--accent-green);
+        }
+        .alert-warning {
+            background-color: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid var(--accent-red);
+            color: var(--accent-red);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(211, 195, 219, 0.3);
+        }
+        .contract-template {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .contract-template:hover {
+            border-color: var(--primary-color);
+            background-color: rgba(211, 195, 219, 0.1);
+        }
+        .log-entry {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f3f4f6;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        .log-timestamp {
+            color: var(--text-light);
+            margin-right: 10px;
+        }
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .wizard-step {
+            display: none;
+        }
+        .wizard-step.active {
+            display: block;
+        }
+        .wizard-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+        .permission-matrix {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .permission-item {
+            display: flex;
+            align-items: center;
+        }
+        .template-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary-color);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            color: white;
+        }
+        .chart-container {
+            height: 250px;
+            width: 100%;
+        }
+        .contract-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.2s ease;
+        }
+        .contract-card:hover {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-active {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--accent-green);
+        }
+        .status-pending {
+            background-color: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+        }
+        .status-error {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: var(--accent-red);
+        }
+        .template-category {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--secondary-color);
+            padding-bottom: 5px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .language-tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .language-tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .language-tab.active {
+            border-bottom: 2px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+        .sandbox-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: 400px;
+        }
+        .sandbox-panel {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .sandbox-header {
+            background: #f9fafb;
+            padding: 10px 15px;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 500;
+        }
+        .sandbox-body {
+            height: calc(100% - 41px);
+            overflow: auto;
+            padding: 15px;
+        }
+        .sandbox-output {
+            background: #1f2937;
+            color: #e5e7eb;
+            font-family: monospace;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .deploy-progress {
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .deploy-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+        .gas-estimate {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .gas-value {
+            font-weight: 600;
+            color: var(--secondary-color);
+        }
+        .repository-tree {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 300px;
+            overflow: auto;
+        }
+        .tree-item {
+            padding: 5px 0;
+            cursor: pointer;
+        }
+        .tree-item:hover {
+            color: var(--primary-color);
+        }
+        .monitor-logs {
+            height: 300px;
+            overflow: auto;
+            background: #1f2937;
+            color: #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--secondary-color);
+            margin: 10px 0;
+        }
+        .stat-label {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+    </style>
+ </head>
+ <body>
+  <div class="container" style="max-width: 100% !important; padding: 5px !important;">
+   <h1 class="text-3xl font-bold mb-6" style="color: var(--secondary-color);">智能合约管理中心</h1>
+   <div class="tab-container">
+    <div class="tab active" onclick="switchTab('sandbox')">
+     合约开发沙箱
+    </div>
+    <div class="tab" onclick="switchTab('deploy')">
+     合约部署向导
+    </div>
+    <div class="tab" onclick="switchTab('repository')">
+     合约仓库
+    </div>
+    <div class="tab" onclick="switchTab('monitor')">
+     合约监控台
+    </div>
+   </div> <!-- 合约开发沙箱 -->
+   <div id="sandbox" class="tab-content active">
+    <div class="card">
+     <h2 class="text-xl font-semibold mb-4">智能合约开发环境</h2>
+     <div class="language-tabs">
+      <div class="language-tab active" onclick="switchLanguage('solidity')">
+       Solidity
+      </div>
+      <div class="language-tab" onclick="switchLanguage('typescript')">
+       TypeScript
+      </div>
+     </div>
+     <div class="flex-between mb-4">
+      <div>
+       <select id="templateSelect" class="form-input" style="width: 250px;"> <option value="">选择合约模板...</option> <optgroup label="贸易金融"> <option value="letterOfCredit">信用证合约</option> <option value="warehouseReceipt">仓单质押合约</option> <option value="tradeFinance">贸易融资合约</option> </optgroup> <optgroup label="供应链"> <option value="supplyChain">供应链溯源合约</option> <option value="invoiceFinancing">发票融资合约</option> </optgroup> </select>
+      </div>
+      <div>
+       <button class="btn-primary mr-2" onclick="runCode()">运行代码</button> <button class="btn-primary" onclick="saveCode()">保存代码</button>
+      </div>
+     </div>
+     <div class="sandbox-container">
+      <div class="sandbox-panel">
+       <div class="sandbox-header">
+        代码编辑器
+       </div>
+       <div class="sandbox-body">
+        <div id="solidityEditor" class="code-editor">
+        </div>
+        <div id="typescriptEditor" class="code-editor" style="display: none;">
+        </div>
+       </div>
+      </div>
+      <div class="sandbox-panel">
+       <div class="sandbox-header">
+        执行结果
+       </div>
+       <div class="sandbox-body sandbox-output" id="executionResult">
+       </div>
+      </div>
+     </div>
+    </div>
+   </div> <!-- 合约部署向导 -->
+   <div id="deploy" class="tab-content">
+    <div class="card">
+     <h2 class="text-xl font-semibold mb-4">合约部署向导</h2>
+     <div class="deploy-progress">
+      <div class="deploy-progress-bar" id="deployProgress" style="width: 0%"></div>
+     </div>
+     <div class="flex-between mb-4">
+      <div>
+       步骤 <span id="currentStep">1</span>/4
+      </div>
+      <div>
+       <button class="btn-primary mr-2" onclick="prevStep()">上一步</button> <button class="btn-primary" onclick="nextStep()">下一步</button>
+      </div>
+     </div>
+     <div id="step1" class="wizard-step active">
+      <h3 class="text-lg font-medium mb-4">合约基本信息</h3>
+      <div class="form-group">
+       <label class="form-label">合约名称</label> <input type="text" class="form-input" id="contractName" placeholder="输入合约名称">
+      </div>
+      <div class="form-group">
+       <label class="form-label">合约版本</label> <input type="text" class="form-input" id="contractVersion" value="1.0.0" placeholder="输入版本号">
+      </div>
+      <div class="form-group">
+       <label class="form-label">合约描述</label> <textarea class="form-input" id="contractDescription" rows="3" placeholder="描述合约功能和用途"></textarea>
+      </div>
+     </div>
+     <div id="step2" class="wizard-step">
+      <h3 class="text-lg font-medium mb-4">网络与Gas配置</h3>
+      <div class="form-group">
+       <label class="form-label">目标网络</label> <select class="form-input" id="targetNetwork"> <option value="mainnet">以太坊主网</option> <option value="ropsten">Ropsten测试网</option> <option value="rinkeby">Rinkeby测试网</option> <option value="localhost">本地开发网络</option> </select>
+      </div>
+      <div class="gas-estimate">
+       <div class="flex-between">
+        <span>预估Gas费用</span> <span class="gas-value" id="gasEstimate">0.0245 ETH</span>
+       </div>
+       <div class="chart-container" id="gasChart"></div>
+      </div>
+      <div class="form-group">
+       <label class="form-label">Gas价格 (Gwei)</label> <input type="range" class="form-input" id="gasPrice" min="1" max="100" value="20">
+       <div class="flex-between">
+        <span>1 Gwei</span> <span id="gasPriceValue">20 Gwei</span> <span>100 Gwei</span>
+       </div>
+      </div>
+     </div>
+     <div id="step3" class="wizard-step">
+      <h3 class="text-lg font-medium mb-4">权限设置</h3>
+      <div class="form-group">
+       <label class="form-label">合约管理员</label> <input type="text" class="form-input" id="adminAddress" placeholder="输入管理员地址">
+      </div>
+      <div>
+       <label class="form-label">访问权限矩阵</label>
+       <div class="permission-matrix">
+        <div class="permission-item">
+         <input type="checkbox" id="perm1" checked> <label for="perm1" class="ml-2">读取数据</label>
+        </div>
+        <div class="permission-item">
+         <input type="checkbox" id="perm2" checked> <label for="perm2" class="ml-2">写入数据</label>
+        </div>
+        <div class="permission-item">
+         <input type="checkbox" id="perm3"> <label for="perm3" class="ml-2">管理权限</label>
+        </div>
+        <div class="permission-item">
+         <input type="checkbox" id="perm4" checked> <label for="perm4" class="ml-2">触发事件</label>
+        </div>
+        <div class="permission-item">
+         <input type="checkbox" id="perm5"> <label for="perm5" class="ml-2">升级合约</label>
+        </div>
+        <div class="permission-item">
+         <input type="checkbox" id="perm6" checked> <label for="perm6" class="ml-2">暂停合约</label>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div id="step4" class="wizard-step">
+      <h3 class="text-lg font-medium mb-4">部署确认</h3>
+      <div class="alert alert-success">
+       所有配置已通过验证，准备部署合约。
+      </div>
+      <div class="form-group">
+       <label class="form-label">合约地址</label> <input type="text" class="form-input" id="expectedAddress" readonly value="0x... (部署后生成)">
+      </div>
+      <div class="form-group">
+       <label class="form-label">部署摘要</label>
+       <div style="background: #f9fafb; padding: 15px; border-radius: 6px; font-size: 14px;">
+        <div class="flex-between mb-2">
+         <span>网络:</span> <span id="summaryNetwork">Ropsten测试网</span>
+        </div>
+        <div class="flex-between mb-2">
+         <span>Gas费用:</span> <span id="summaryGas">0.0245 ETH</span>
+        </div>
+        <div class="flex-between mb-2">
+         <span>合约名称:</span> <span id="summaryName">信用证合约v1</span>
+        </div>
+        <div class="flex-between">
+         <span>管理员:</span> <span id="summaryAdmin">0x742d35Cc...E5a0</span>
+        </div>
+       </div>
+      </div> <button class="btn-primary" onclick="deployContract()" style="width: 100%;">确认部署</button>
+     </div>
+    </div>
+   </div> <!-- 合约仓库 -->
+   <div id="repository" class="tab-content">
+    <div class="card">
+     <h2 class="text-xl font-semibold mb-4">合约仓库</h2>
+     <div class="flex-between mb-4">
+      <div>
+       <input type="text" class="form-input" placeholder="搜索合约..." style="width: 300px;">
+      </div>
+      <div>
+       <button class="btn-primary" onclick="showUploadModal()">上传新合约</button>
+      </div>
+     </div>
+     <div class="repository-tree">
+      <div class="tree-item" onclick="toggleFolder('trade')">
+       📁 贸易金融合约
+      </div>
+      <div id="tradeSub" style="display: none; margin-left: 20px;">
+       <div class="tree-item" onclick="selectContract('lc1')">
+        📄 信用证合约 v1.0
+       </div>
+       <div class="tree-item" onclick="selectContract('lc2')">
+        📄 信用证合约 v2.0
+       </div>
+       <div class="tree-item" onclick="selectContract('wr1')">
+        📄 仓单质押合约 v1.2
+       </div>
+      </div>
+      <div class="tree-item" onclick="toggleFolder('supply')">
+       📁 供应链合约
+      </div>
+      <div id="supplySub" style="display: none; margin-left: 20px;">
+       <div class="tree-item" onclick="selectContract('sc1')">
+        📄 供应链溯源合约 v2.1
+       </div>
+       <div class="tree-item" onclick="selectContract('if1')">
+        📄 发票融资合约 v1.5
+       </div>
+      </div>
+      <div class="tree-item" onclick="toggleFolder('custom')">
+       📁 自定义合约
+      </div>
+      <div id="customSub" style="display: none; margin-left: 20px;">
+       <div class="tree-item" onclick="selectContract('custom1')">
+        📄 自定义合约1
+       </div>
+      </div>
+     </div>
+     <div id="contractDetails" style="display: none;">
+      <h3 class="text-lg font-medium mt-6 mb-4">合约详情</h3>
+      <div class="contract-card">
+       <div class="flex-between mb-3">
+        <h4 class="font-semibold" id="detailName">信用证合约</h4> <span class="status-badge status-active" id="detailStatus">已部署</span>
+       </div>
+       <div class="mb-3 text-sm" id="detailDescription">
+        用于国际贸易中的信用证业务，实现安全支付保障。
+       </div>
+       <div class="flex-between text-sm">
+        <div>
+         <span class="text-gray-500">版本: </span> <span id="detailVersion">1.0.0</span>
+        </div>
+        <div>
+         <span class="text-gray-500">创建人: </span> <span id="detailAuthor">孔光</span>
+        </div>
+        <div>
+         <span class="text-gray-500">更新时间: </span> <span id="detailUpdate">2025-03-25</span>
+        </div>
+       </div>
+       <div class="mt-4">
+        <button class="btn-primary mr-2" onclick="showVersionComparison()">版本对比</button> <button class="btn-primary" onclick="showPermissionModal()">权限管理</button>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div> <!-- 合约监控台 -->
+   <div id="monitor" class="tab-content">
+    <div class="card">
+     <h2 class="text-xl font-semibold mb-4">合约监控台</h2>
+     <div class="stats-grid">
+      <div class="stat-card">
+       <div class="stat-label">
+        活跃合约
+       </div>
+       <div class="stat-value">
+        24
+       </div>
+      </div>
+      <div class="stat-card">
+       <div class="stat-label">
+        今日调用
+       </div>
+       <div class="stat-value">
+        1,284
+       </div>
+      </div>
+      <div class="stat-card">
+       <div class="stat-label">
+        异常事件
+       </div>
+       <div class="stat-value" style="color: var(--accent-red);">
+        3
+       </div>
+      </div>
+      <div class="stat-card">
+       <div class="stat-label">
+        平均响应时间
+       </div>
+       <div class="stat-value">
+        128ms
+       </div>
+      </div>
+     </div>
+     <div class="mb-6">
+      <div class="chart-container" id="monitorChart"></div>
+     </div>
+     <h3 class="text-lg font-medium mb-4">实时日志</h3>
+     <div class="monitor-logs" id="monitorLogs">
+      <div class="log-entry">
+       <span class="log-timestamp">[10:23:45]</span> <span>合约 0x8a3d...c45b 调用成功: issueLetter()</span>
+      </div>
+      <div class="log-entry">
+       <span class="log-timestamp">[10:24:12]</span> <span>事件触发: LetterIssued(买方: 0x7b2f...d91e, 卖方: 0x5e1a...f32c, 金额: 50000)</span>
+      </div>
+      <div class="log-entry">
+       <span class="log-timestamp">[10:25:03]</span> <span style="color: var(--accent-green);">状态变更: 合约状态从 DRAFT 变为 ISSUED</span>
+      </div>
+      <div class="log-entry">
+       <span class="log-timestamp">[10:26:47]</span> <span>合约 0x8a3d...c45b 调用: executePayment()</span>
+      </div>
+      <div class="log-entry">
+       <span class="log-timestamp">[10:27:15]</span> <span style="color: var(--accent-red);">警告: 权限验证失败 - 调用者不是卖方地址</span>
+      </div>
+      <div class="log-entry">
+       <span class="log-timestamp">[10:28:22]</span> <span>事件触发: PaymentExecuted(卖方: 0x5e1a...f32c, 金额: 50000)</span>
+      </div>
+     </div>
+     <div class="mt-4">
+      <button class="btn-primary" onclick="exportLogs()">导出日志</button>
+     </div>
+    </div>
+   </div>
+  </div> <!-- 上传合约模态框 -->
+  <div id="uploadModal" class="modal">
+   <div class="modal-content">
+    <button class="close-btn" onclick="closeModal('uploadModal')">×</button>
+    <h2 class="text-xl font-semibold mb-4">上传新合约</h2>
+    <div class="form-group">
+     <label class="form-label">合约文件</label> <input type="file" class="form-input" accept=".sol,.ts,.json">
+    </div>
+    <div class="form-group">
+     <label class="form-label">合约名称</label> <input type="text" class="form-input" placeholder="输入合约名称">
+    </div>
+    <div class="form-group">
+     <label class="form-label">合约类型</label> <select class="form-input"> <option value="">选择合约类型...</option> <option value="trade">贸易金融</option> <option value="supply">供应链</option> <option value="custom">自定义</option> </select>
+    </div>
+    <div class="form-group">
+     <label class="form-label">版本号</label> <input type="text" class="form-input" value="1.0.0" placeholder="输入版本号">
+    </div>
+    <div class="form-group">
+     <label class="form-label">描述</label> <textarea class="form-input" rows="3" placeholder="描述合约功能和用途"></textarea>
+    </div> <button class="btn-primary" style="width: 100%;" onclick="uploadContract()">上传合约</button>
+   </div>
+  </div> <!-- 权限管理模态框 -->
+  <div id="permissionModal" class="modal">
+   <div class="modal-content">
+    <button class="close-btn" onclick="closeModal('permissionModal')">×</button>
+    <h2 class="text-xl font-semibold mb-4">权限管理</h2>
+    <div class="form-group">
+     <label class="form-label">合约地址</label> <input type="text" class="form-input" value="0x8a3d7c2f1e45b89a12c45b" readonly>
+    </div>
+    <div class="form-group">
+     <label class="form-label">当前管理员</label> <input type="text" class="form-input" value="0x742d35Cc6634C893292Ce8E5a0" readonly>
+    </div>
+    <div class="form-group">
+     <label class="form-label">添加新权限</label>
+     <div class="flex-between">
+      <input type="text" class="form-input" placeholder="输入地址" style="margin-right: 10px;"> <select class="form-input" style="width: 150px;"> <option value="read">只读</option> <option value="write">读写</option> <option value="admin">管理员</option> </select>
+     </div>
+    </div>
+    <h3 class="font-medium mb-3">现有权限列表</h3>
+    <div style="max-height: 200px; overflow: auto;">
+     <div class="flex-between py-2 border-b">
+      <span>0x742d35Cc6634C893292Ce8E5a0</span> <span class="status-badge status-active">管理员</span>
+     </div>
+     <div class="flex-between py-2 border-b">
+      <span>0x5e1a7f3c9d82b1a4f32c</span> <span class="status-badge status-active">读写</span>
+     </div>
+     <div class="flex-between py-2 border-b">
+      <span>0x7b2f8d1e3a5c9b7a1d91e</span> <span class="status-badge status-active">读写</span>
+     </div>
+     <div class="flex-between py-2">
+      <span>0x9a4b6c8d2e1f3a5c7b9d</span> <span class="status-badge status-active">只读</span>
+     </div>
+    </div> <button class="btn-primary mt-4" style="width: 100%;" onclick="updatePermissions()">更新权限</button>
+   </div>
+  </div> <!-- 版本对比模态框 -->
+  <div id="versionModal" class="modal">
+   <div class="modal-content">
+    <button class="close-btn" onclick="closeModal('versionModal')">×</button>
+    <h2 class="text-xl font-semibold mb-4">版本对比</h2>
+    <div class="flex-between mb-4">
+     <select class="form-input" style="width: 45%;"> <option>信用证合约 v1.0</option> </select> <select class="form-input" style="width: 45%;"> <option>信用证合约 v2.0</option> </select>
+    </div>
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 13px; max-height: 300px; overflow: auto;">
+     <div style="color: var(--accent-green);">
+      + // 新增: 增加合约暂停功能
+     </div>
+     <div style="color: var(--accent-green);">
+      + function pauseContract() external onlyOwner {
+     </div>
+     <div style="color: var(--accent-green);">
+      + &nbsp;&nbsp;&nbsp;isPaused = true;
+     </div>
+     <div style="color: var(--accent-green);">
+      + }
+     </div>
+     <div style="color: var(--accent-green);">
+      +
+     </div>
+     <div style="color: var(--accent-green);">
+      + function unpauseContract() external onlyOwner {
+     </div>
+     <div style="color: var(--accent-green);">
+      + &nbsp;&nbsp;&nbsp;isPaused = false;
+     </div>
+     <div style="color: var(--accent-green);">
+      + }
+     </div>
+     <div><br>
+     </div>
+     <div style="color: var(--accent-red);">
+      - // 移除: 旧的价格计算方式
+     </div>
+     <div style="color: var(--accent-red);">
+      - function calculateLegacyPrice(uint amount) private pure returns (uint) {
+     </div>
+     <div style="color: var(--accent-red);">
+      - &nbsp;&nbsp;&nbsp;return amount * 110 / 100;
+     </div>
+     <div style="color: var(--accent-red);">
+      - }
+     </div>
+    </div> <button class="btn-primary mt-4" style="width: 100%;" onclick="closeModal('versionModal')">关闭</button>
+   </div>
+  </div>
+  <script>
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+            if (tabName === 'deploy') {
+                initGasChart();
+            } else if (tabName === 'monitor') {
+                initMonitorChart();
+            }
+        }
+        function switchLanguage(lang) {
+            document.querySelectorAll('.language-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            if (lang === 'solidity') {
+                document.getElementById('solidityEditor').style.display = 'block';
+                document.getElementById('typescriptEditor').style.display = 'none';
+            } else {
+                document.getElementById('solidityEditor').style.display = 'none';
+                document.getElementById('typescriptEditor').style.display = 'block';
+            }
+        }
+        function runCode() {
+            document.getElementById('executionResult').innerHTML = 
+                '<div style="color: #10B981;">编译成功!</div>' +
+                '<div>合约已编译，无错误。</div>' +
+                '<div>生成字节码: 0x608060405234801561001057600080fd5b5060...</div>' +
+        }
+        function saveCode() {
+            showAlert('代码已成功保存到本地存储。', 'success');
+        }
+        let currentDeployStep = 1;
+        function nextStep() {
+            if (currentDeployStep < 4) {
+                document.getElementById('step' + currentDeployStep).classList.remove('active');
+                currentDeployStep++;
+                document.getElementById('step' + currentDeployStep).classList.add('active');
+                document.getElementById('currentStep').textContent = currentDeployStep;
+                document.getElementById('deployProgress').style.width = (currentDeployStep * 25) + '%';
+            }
+        }
+        function prevStep() {
+            if (currentDeployStep > 1) {
+                document.getElementById('step' + currentDeployStep).classList.remove('active');
+                currentDeployStep--;
+                document.getElementById('step' + currentDeployStep).classList.add('active');
+                document.getElementById('currentStep').textContent = currentDeployStep;
+                document.getElementById('deployProgress').style.width = (currentDeployStep * 25) + '%';
+            }
+        }
+        function deployContract() {
+            showAlert('合约部署请求已提交，等待区块链确认...', 'success');
+            setTimeout(() => {
+                showAlert('合约已成功部署到区块链!', 'success');
+                document.getElementById('expectedAddress').value = '0x8a3d7c2f1e45b89a12c45b';
+            }, 2000);
+        }
+        function initGasChart() {
+            const chart = echarts.init(document.getElementById('gasChart'));
+            const option = {
+                tooltip: {
+                    trigger: 'axis'
+                },
+                xAxis: {
+                    type: 'category',
+                    data: ['0:00', '4:00', '8:00', '12:00', '16:00', '20:00']
+                },
+                yAxis: {
+                    type: 'value',
+                    name: 'Gwei'
+                },
+                series: [{
+                    data: [20, 34, 18, 25, 15, 22],
+                    type: 'line',
+                    smooth: true,
+                    lineStyle: {
+                        color: '#D3C3DB'
+                    },
+                    areaStyle: {
+                        color: {
+                            type: 'linear',
+                            x: 0,
+                            y: 0,
+                            x2: 0,
+                            y2: 1,
+                            colorStops: [{
+                                offset: 0,
+                                color: 'rgba(211, 195, 219, 0.3)'
+                            }, {
+                                offset: 1,
+                                color: 'rgba(211, 195, 219, 0)'
+                            }]
+                        }
+                    }
+                }]
+            };
+            chart.setOption(option);
+        }
+        function initMonitorChart() {
+            const chart = echarts.init(document.getElementById('monitorChart'));
+            const option = {
+                tooltip: {
+                    trigger: 'axis'
+                },
+                legend: {
+                    data: ['合约调用', '事件触发', '异常事件']
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: ['03-22', '03-23', '03-24', '03-25', '03-26', '03-27', '03-28']
+                },
+                yAxis: {
+                    type: 'value'
+                },
+                series: [
+                    {
+                        name: '合约调用',
+                        type: 'line',
+                        stack: 'Total',
+                        data: [120, 132, 101, 134, 90, 230, 210],
+                        lineStyle: {
+                            color: '#D3C3DB'
+                        }
+                    },
+                    {
+                        name: '事件触发',
+                        type: 'line',
+                        stack: 'Total',
+                        data: [220, 182, 191, 234, 290, 330, 310],
+                        lineStyle: {
+                            color: '#10B981'
+                        }
+                    },
+                    {
+                        name: '异常事件',
+                        type: 'line',
+                        stack: 'Total',
+                        data: [150, 232, 201, 154, 190, 330, 410],
+                        lineStyle: {
+                            color: '#EF4444'
+                        }
+                    }
+                ]
+            };
+            chart.setOption(option);
+        }
+        function toggleFolder(folderId) {
+            const element = document.getElementById(folderId + 'Sub');
+            if (element.style.display === 'none') {
+                element.style.display = 'block';
+            } else {
+                element.style.display = 'none';
+            }
+        }
+        function selectContract(contractId) {
+            document.getElementById('contractDetails').style.display = 'block';
+            if (contractId === 'lc1') {
+                document.getElementById('detailName').textContent = '信用证合约';
+                document.getElementById('detailDescription').textContent = '用于国际贸易中的信用证业务，实现安全支付保障。';
+                document.getElementById('detailVersion').textContent = '1.0.0';
+                document.getElementById('detailAuthor').textContent = '孔光';
+                document.getElementById('detailUpdate').textContent = '2025-03-25';
+                document.getElementById('detailStatus').textContent = '已部署';
+                document.getElementById('detailStatus').className = 'status-badge status-active';
+            } else if (contractId === 'lc2') {
+                document.getElementById('detailName').textContent = '信用证合约';
+                document.getElementById('detailDescription').textContent = '第二代信用证合约，增加暂停功能和多重签名支持。';
+                document.getElementById('detailVersion').textContent = '2.0.0';
+                document.getElementById('detailAuthor').textContent = '段学建';
+                document.getElementById('detailUpdate').textContent = '2025-03-27';
+                document.getElementById('detailStatus').textContent = '测试中';
+                document.getElementById('detailStatus').className = 'status-badge status-pending';
+            } else if (contractId === 'wr1') {
+                document.getElementById('detailName').textContent = '仓单质押合约';
+                document.getElementById('detailDescription').textContent = '实现仓单数字化管理和质押融资功能。';
+                document.getElementById('detailVersion').textContent = '1.2.0';
+                document.getElementById('detailAuthor').textContent = '田鹏晨';
+                document.getElementById('detailUpdate').textContent = '2025-03-20';
+                document.getElementById('detailStatus').textContent = '已部署';
+                document.getElementById('detailStatus').className = 'status-badge status-active';
+            }
+        }
+        function showUploadModal() {
+            document.getElementById('uploadModal').style.display = 'flex';
+        }
+        function showPermissionModal() {
+            document.getElementById('permissionModal').style.display = 'flex';
+        }
+        function showVersionComparison() {
+            document.getElementById('versionModal').style.display = 'flex';
+        }
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+        function uploadContract() {
+            showAlert('合约上传成功，已添加到仓库。', 'success');
+            closeModal('uploadModal');
+        }
+        function updatePermissions() {
+            showAlert('权限已成功更新。', 'success');
+            closeModal('permissionModal');
+        }
+        function exportLogs() {
+            showAlert('日志导出成功，已下载到本地。', 'success');
+        }
+        function showAlert(message, type) {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.innerHTML = `
+                <svg style="width: 20px; height: 20px; margin-right: 10px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                ${message}
+            `;
+            document.querySelector('.container').appendChild(alert);
+            setTimeout(() => {
+                alert.remove();
+            }, 3000);
+        }
+        document.getElementById('gasPrice').addEventListener('input', function() {
+            document.getElementById('gasPriceValue').textContent = this.value + ' Gwei';
+            const estimate = (0.0245 * (this.value / 20)).toFixed(4);
+            document.getElementById('gasEstimate').textContent = estimate + ' ETH';
+            if (document.getElementById('summaryGas')) {
+                document.getElementById('summaryGas').textContent = estimate + ' ETH';
+            }
+        });
+        window.onload = function() {
+            initGasChart();
+            initMonitorChart();
+            document.getElementById('gasPriceValue').textContent = '20 Gwei';
+            if (document.getElementById('summaryNetwork')) {
+                document.getElementById('summaryNetwork').textContent = 'Ropsten测试网';
+                document.getElementById('summaryGas').textContent = '0.0245 ETH';
+                document.getElementById('summaryName').textContent = '信用证合约v1';
+                document.getElementById('summaryAdmin').textContent = '0x742d35Cc...E5a0';
+            }
+        };
+    </script>
+ </body>
+</html>from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from web3 import Web3
+from typing import List
+app = FastAPI()
+class ContractRequest(BaseModel):
+    code: str
+    params: dict
+@app.post("/deploy_contract")
+def deploy_contract(request: ContractRequest):
+    try:
+        result = deployment_wizard.deploy_contract(request.code, request.params)
+        return result
+    except Exception as e:
+        # 错误处理，记录审计日志
+        logging.error(f"部署合约出错: {str(e)}")
+        raise HTTPException(status_code=500, detail="部署合约出错")
+import logging
+from web3 import Web3
+from celery import Celery
+from typing import List
+from pydantic import BaseModel
+# 初始化Celery
+celery_app = Celery('tasks', broker='redis://localhost:6379/0')
+class DeploymentWizard:
+    def __init__(self):
+        self.web3 = Web3(Web3.HTTPProvider('http://localhost:8545'))
+    def deploy_contract(self, code: str, params: dict):
+        # Gas优化算法选择
+        gas_algorithm = self.select_gas_algorithm()
+        gas = gas_algorithm()
+        # 权限矩阵配置
+        self.configure_permissions()
+        # ABI验证
+        if not self.validate_abi(code):
+            raise ValueError("ABI验证失败")
+        # 部署合约逻辑
+        compiled_sol = self.compile_solidity(code)
+        contract_interface = compiled_sol['contracts']['MyContract']['abi']
+        contract = self.web3.eth.contract(abi=contract_interface, bytecode=compiled_sol['contracts']['MyContract']['evm']['bytecode']['object'])
+        tx_hash = contract.constructor(*params.values()).transact({'from': self.web3.eth.accounts[0], 'gas': gas})
+        tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        return tx_receipt
+    def select_gas_algorithm(self):
+        available_algorithms = [self.gas_algorithm1, self.gas_algorithm2, self.gas_algorithm3]
+        return available_algorithms[0]
+    def gas_algorithm1(self):
+        network_gas_price = self.web3.eth.gas_price
+        return network_gas_price * 100000
+    def gas_algorithm2(self):
+        # 基于历史交易数据的Gas计算
+        return 500000
+    def gas_algorithm3(self):
+        # 基于博弈论的Gas计算
+        # 实际实现需要复杂的博弈论模型
+        return 300000
+    def configure_permissions(self):
+        # 权限矩阵配置逻辑
+        pass
+    def validate_abi(self, code: str):
+        # ABI验证逻辑
+        return True
+    def compile_solidity(self, code: str):
+        # Solidity编译逻辑
+        from solcx import compile_source
+        return compile_source(code)
+# 实例化DeploymentWizard
+deployment_wizard = DeploymentWizard()
+from sqlalchemy import create_engine, Column, Integer, String, Text
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from redis import Redis
+Base = declarative_base()
+class ContractModel(Base):
+    __tablename__ = 'contracts'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(Text)
+    abi = Column(Text)
+    address = Column(String(42))
+engine = create_engine('postgresql://user:password@localhost:5432/blockchain_db')
+Session = sessionmaker(bind=engine)
+redis_client = Redis(host='localhost', port=6379, db=0)
+class ContractRepository:
+    def save_contract(self, code: str, abi: str, address: str):
+        session = Session()
+        try:
+            contract = ContractModel(code=code, abi=abi, address=address)
+            session.add(contract)
+            session.commit()
+            # 存储到Redis
+            redis_client.set(address, code)
+        except Exception as e:
+            session.rollback()
+            logging.error(f"保存合约出错: {str(e)}")
+        finally:
+            session.close()
+    def get_contract(self, address: str):
+        session = Session()
+        try:
+            contract = session.query(ContractModel).filter(ContractModel.address == address).first()
+            if contract:
+                return contract.code
+            else:
+                # 尝试从Redis获取
+                return redis_client.get(address)
+        except Exception as e:
+            logging.error(f"获取合约出错: {str(e)}")
+        finally:
+            session.close()
+# 实例化ContractRepository
+contract_repository = ContractRepository()
+# ContractSandbox相关
+import ast
+from typing import List
+class ContractSandbox:
+    def static_analysis(self, code: str):
+        try:
+            tree = ast.parse(code)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and node.func.id == 'print':
+                    logging.warning("发现print语句，可能不适合生产环境")
+            return True
+        except SyntaxError as e:
+            logging.error(f"语法错误: {str(e)}")
+            return False
+    def transaction_simulation(self, code: str, params: dict):
+        if self.static_analysis(code):
+        else:
+    def template_generation(self):
+        # 模板生成逻辑
+        return "合约模板内容"
+# 实例化ContractSandbox
+contract_sandbox = ContractSandbox()
+# MonitorConsole相关
+import numpy as np
+import pandas as pd
+from keras.models import Sequential
+from keras.layers import LSTM, Dense
+class MonitorConsole:
+    def __init__(self):
+        self.event_history = []
+    def record_event(self, event: dict):
+        self.event_history.append(event)
+    def risk_assessment(self):
+        # 滑动时间窗风险评估模型
+        window_size = 10
+        recent_events = self.event_history[-window_size:]
+        if len(recent_events) < window_size:
+            return "低风险"
+        else:
+            return "高风险"
+    def build_lstm_model(self, data):
+        model = Sequential()
+        model.add(LSTM(50, return_sequences=True, input_shape=(data.shape[1], data.shape[2])))
+        model.add(LSTM(50))
+        model.add(Dense(1))
+        model.compile(optimizer='adam', loss='mse')
+        return model
+    def anomaly_detection(self):
+        # 基于时序分析的异常检测
+        data = np.array(self.event_history)
+        if data.shape[0] < 2:
+            return "数据不足，无法检测异常"
+        data = np.reshape(data, (data.shape[0], 1, 1))
+        model = self.build_lstm_model(data)
+        model.fit(data, epochs=10, batch_size=1)
+        predictions = model.predict(data)
+        error = np.mean(np.square(predictions - data))
+        if error > 0.5:
+            return "检测到异常"
+        else:
+            return "未检测到异常"
+# 实例化MonitorConsole
+monitor_console = MonitorConsole()
+# 审计日志配置
+import logging
+logging.basicConfig(filename='audit.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+if __name__ == "__main__":
+    sample_code = "contract MyContract {}"
+    sample_params = {}"
+    deploy_result = deployment_wizard.deploy_contract(sample_code, sample_params)
+    contract_repository.save_contract(sample_code, "", deploy_result['contractAddress'])
+    monitor_console.record_event({"type": "contract_deployed", "address": deploy_result['contractAddress']})
+    print(monitor_console.risk_assessment())
+    print(monitor_console.anomaly_detection())
+3. 信用评估源代码
+<!doctype html>
+<html lang="zh-CN">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>区块链智能贸易信用平台 - 信用评估</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://jsd.onmicrosoft.cn/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+        :root {
+            --primary: #D3C3DB;
+            --secondary-blue: #4F46E5;
+            --secondary-green: #10B981;
+            --warning-red: #EF4444;
+            --text-dark: #1F2937;
+            --text-light: #6B7280;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+            color: var(--text-dark);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        .badge-3d {
+            box-shadow: 
+                0 2px 4px rgba(0,0,0,0.1),
+                0 4px 8px rgba(0,0,0,0.1),
+                0 8px 16px rgba(0,0,0,0.1);
+            border-radius: 50%;
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        .chart-container {
+            height: 300px;
+        }
+        .hidden {
+            display: none;
+        }
+        .visible {
+            display: block;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+ </head>
+ <body class="p-6">
+  <!-- 顶部概览区 -->
+  <div class="glass-card p-6 mb-6">
+   <div class="flex justify-between items-center mb-4">
+    <h1 class="text-2xl font-bold">企业信用评估</h1>
+    <div class="flex items-center space-x-2">
+     <span class="text-sm text-gray-500">最后更新: 2025-03-28 14:30</span>
+     <div class="pulse w-3 h-3 bg-green-500 rounded-full"></div>
+    </div>
+   </div>
+   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="bg-white p-4 rounded-lg shadow">
+     <h3 class="text-lg font-semibold mb-2">企业基本信息</h3>
+     <p class="text-sm text-gray-600">企业名称: 远航科技有限公司</p>
+     <p class="text-sm text-gray-600">统一社会信用代码: 9131010MA1FPX1234</p>
+     <p class="text-sm text-gray-600">所属行业: 信息技术服务</p>
+     <p class="text-sm text-gray-600">注册时间: 2020-05-10</p>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow flex flex-col items-center justify-center">
+     <div class="badge-3d w-20 h-20 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center mb-3">
+      <span class="text-white text-2xl font-bold">AA</span>
+     </div>
+     <h3 class="text-lg font-semibold mb-2">信用等级</h3>
+     <div class="text-3xl font-bold text-green-600" id="creditScore">
+      86
+     </div>
+     <p class="text-sm text-gray-600">满分100分</p>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow">
+     <h3 class="text-lg font-semibold mb-2">评估摘要</h3>
+     <p class="text-sm text-gray-600">付款准时率: 94%</p>
+     <p class="text-sm text-gray-600">订单完成率: 97%</p>
+     <p class="text-sm text-gray-600">税务合规: 优秀</p>
+     <p class="text-sm text-gray-600">海关记录: 良好</p>
+    </div>
+   </div>
+  </div> <!-- 中部分析区 -->
+  <div class="glass-card p-6 mb-6">
+   <h2 class="text-xl font-semibold mb-4">多维度信用分析</h2>
+   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white p-4 rounded-lg shadow">
+     <h3 class="text-lg font-semibold mb-4">信用维度雷达图</h3>
+     <div class="chart-container" id="radarChart"></div>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow">
+     <h3 class="text-lg font-semibold mb-4">信用历史趋势</h3>
+     <div class="chart-container" id="trendChart"></div>
+    </div>
+   </div>
+   <div class="mt-6">
+    <h3 class="text-lg font-semibold mb-4">数据来源分布</h3>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+     <div class="bg-blue-50 p-3 rounded">
+      <h4 class="font-medium text-blue-700">工商数据</h4>
+      <p class="text-sm text-blue-600">完整性: 100%</p>
+     </div>
+     <div class="bg-green-50 p-3 rounded">
+      <h4 class="font-medium text-green-700">财务数据</h4>
+      <p class="text-sm text-green-600">完整性: 92%</p>
+     </div>
+     <div class="bg-purple-50 p-3 rounded">
+      <h4 class="font-medium text-purple-700">贸易数据</h4>
+      <p class="text-sm text-purple-600">完整性: 88%</p>
+     </div>
+     <div class="bg-orange-50 p-3 rounded">
+      <h4 class="font-medium text-orange-700">第三方数据</h4>
+      <p class="text-sm text-orange-600">完整性: 95%</p>
+     </div>
+    </div>
+   </div>
+  </div> <!-- 底部详情区 -->
+  <div class="glass-card p-6">
+   <h2 class="text-xl font-semibold mb-4">详细评估指标</h2>
+   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white p-4 rounded-lg shadow">
+     <h3 class="text-lg font-semibold mb-3">企业档案信息</h3>
+     <div class="space-y-2">
+      <div class="flex justify-between">
+       <span class="text-gray-600">注册资本</span> <span class="font-medium">1000万元</span>
+      </div>
+      <div class="flex justify-between">
+       <span class="text-gray-600">实缴资本</span> <span class="font-medium">800万元</span>
+      </div>
+      <div class="flex justify-between">
+       <span class="text-gray-600">参保人数</span> <span class="font-medium">45人</span>
+      </div> <button class="mt-3 px-4 py-2 bg-primary text-white rounded hover:bg-opacity-90 transition" id="viewArchive">查看完整档案</button>
+     </div>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow">
+     <h3 class="text-lg font-semibold mb-3">贸易行为分析</h3>
+     <div class="space-y-2">
+      <div class="flex justify-between">
+       <span class="text-gray-600">历史订单数</span> <span class="font-medium">156笔</span>
+      </div>
+      <div class="flex justify-between">
+       <span class="text-gray-600">平均完成时间</span> <span class="font-medium">7.2天</span>
+      </div>
+      <div class="flex justify-between">
+       <span class="text-gray-600">纠纷率</span> <span class="font-medium text-green-600">2.1%</span>
+      </div> <button class="mt-3 px-4 py-2 bg-primary text-white rounded hover:bg-opacity-90 transition" id="viewTradeAnalysis">查看详细分析</button>
+     </div>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow">
+     <h3 class="text-lg font-semibold mb-3">第三方信用记录</h3>
+     <div class="space-y-2">
+      <div class="flex justify-between">
+       <span class="text-gray-600">海关信用等级</span> <span class="font-medium">A类企业</span>
+      </div>
+      <div class="flex justify-between">
+       <span class="text-gray-600">税务信用等级</span> <span class="font-medium">B类企业</span>
+      </div>
+      <div class="flex justify-between">
+       <span class="text-gray-600">银行信用记录</span> <span class="font-medium text-green-600">无不良记录</span>
+      </div> <button class="mt-3 px-4 py-2 bg-primary text-white rounded hover:bg-opacity-90 transition" id="viewThirdParty">查看第三方数据</button>
+     </div>
+    </div>
+    <div class="bg-white p-4 rounded-lg shadow">
+     <h3 class="text-lg font-semibold mb-3">区块链存证信息</h3>
+     <div class="space-y-2">
+      <div class="flex justify-between">
+       <span class="text-gray-600">存证时间</span> <span class="font-medium">2025-03-28 14:30:25</span>
+      </div>
+      <div class="flex justify-between">
+       <span class="text-gray-600">区块高度</span> <span class="font-medium">#1234567</span>
+      </div>
+      <div class="flex justify-between">
+       <span class="text-gray-600">交易哈希</span> <span class="font-medium text-blue-600">0x8a3f...c234</span>
+      </div> <button class="mt-3 px-4 py-2 bg-primary text-white rounded hover:bg-opacity-90 transition" id="viewBlockchain">查看区块链详情</button>
+     </div>
+    </div>
+   </div>
+   <div class="flex space-x-4">
+    <button class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition" id="generateReport">生成信用报告</button> <button class="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition" id="submitAppeal">提交异议申诉</button>
+   </div>
+  </div> <!-- 模态框区域 -->
+  <div id="modalOverlay" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+   <div class="modal-container absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl w-11/12 max-w-2xl">
+    <div class="modal-header bg-primary text-white p-4 rounded-t-lg">
+     <h3 class="text-xl font-semibold" id="modalTitle">模态框标题</h3> <button class="absolute top-4 right-4 text-white" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body p-6" id="modalContent">
+     <!-- 内容动态加载 -->
+    </div>
+   </div>
+  </div>
+  <script>
+        function initCharts() {
+            const radarChart = echarts.init(document.getElementById('radarChart'));
+            const radarOption = {
+                radar: {
+                    indicator: [
+                        { name: '企业资质', max: 100 },
+                        { name: '财务健康', max: 100 },
+                        { name: '贸易信用', max: 100 },
+                        { name: '合规记录', max: 100 },
+                        { name: '行业地位', max: 100 }
+                    ],
+                    radius: 80
+                },
+                series: [{
+                    type: 'radar',
+                    data: [{
+                        value: [85, 78, 92, 88, 76],
+                        name: '当前评分',
+                        areaStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
+                                offset: 0,
+                                color: 'rgba(79, 70, 229, 0.3)'
+                            }, {
+                                offset: 1,
+                                color: 'rgba(79, 70, 229, 0.1)'
+                            }])
+                        }
+                    }]
+                }]
+            };
+            radarChart.setOption(radarOption);
+            const trendChart = echarts.init(document.getElementById('trendChart'));
+            const trendOption = {
+                xAxis: {
+                    type: 'category',
+                    data: ['2024-01', '2024-04', '2024-07', '2024-10', '2025-01']
+                },
+                yAxis: {
+                    type: 'value',
+                    min: 70,
+                    max: 100
+                },
+                series: [{
+                    data: [78, 82, 80, 85, 86],
+                    type: 'line',
+                    smooth: true,
+                    lineStyle: {
+                        width: 3,
+                        color: '#4F46E5'
+                    },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
+                            offset: 0,
+                            color: 'rgba(79, 70, 229, 0.3)'
+                        }, {
+                            offset: 1,
+                            color: 'rgba(79, 70, 229, 0.1)'
+                        }])
+                    }
+                }]
+            };
+            trendChart.setOption(trendOption);
+            window.addEventListener('resize', function() {
+                radarChart.resize();
+                trendChart.resize();
+            });
+        }
+        function openModal(title, content) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalContent').innerHTML = content;
+            document.getElementById('modalOverlay').classList.remove('hidden');
+            document.getElementById('modalOverlay').classList.add('fade-in');
+        }
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.add('hidden');
+            document.getElementById('modalOverlay').classList.remove('fade-in');
+        }
+        function animateValue(element, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                element.innerHTML = Math.floor(progress * (end - start) + start);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            const creditScore = document.getElementById('creditScore');
+            animateValue(creditScore, 0, 86, 2000);
+            document.getElementById('viewArchive').addEventListener('click', function() {
+                openModal('企业完整档案信息', `
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="font-semibold text-gray-700">工商注册信息</h4>
+                                <p class="text-sm text-gray-600">注册号: 9131010MA1FPX1234</p>
+                                <p class="text-sm text-gray-600">法人代表: 钱凡咏</p>
+                                <p class="text-sm text-gray-600">注册资本: 1000万元</p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-700">经营状况</h4>
+                                <p class="text-sm text-gray-600">经营状态: 开业</p>
+                                <p class="text-sm text-gray-600">成立日期: 2020-05-10</p>
+                                <p class="text-sm text-gray-600">营业期限: 2020-05-10 至 2040-05-09</p>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded">
+                            <h4 class="font-semibold text-gray-700 mb-2">最新财务摘要</h4>
+                            <p class="text-sm text-gray-600">总资产: 2850万元</p>
+                            <p class="text-sm text-gray-600">净资产: 1820万元</p>
+                            <p class="text-sm text-gray-600">年营业收入: 1560万元</p>
+                            <p class="text-sm text-gray-600">净利润: 320万元</p>
+                        </div>
+                    </div>
+                `);
+            });
+            document.getElementById('viewTradeAnalysis').addEventListener('click', function() {
+                openModal('贸易行为详细分析', `
+                    <div class="space-y-4">
+                        <div class="bg-blue-50 p-4 rounded">
+                            <h4 class="font-semibold text-blue-700 mb-2">订单完成情况</h4>
+                            <p class="text-sm text-blue-600">总订单数: 156笔</p>
+                            <p class="text-sm text-blue-600">完成订单: 151笔</p>
+                            <p class="text-sm text-blue-600">完成率: 96.8%</p>
+                            <p class="text-sm text-blue-600">平均完成时间: 7.2天</p>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded">
+                            <h4 class="font-semibold text-green-700 mb-2">付款行为分析</h4>
+                            <p class="text-sm text-green-600">平均付款周期: 28.5天</p>
+                            <p class="text-sm text-green-600">准时付款率: 94.2%</p>
+                            <p class="text-sm text-green-600">逾期次数: 3次</p>
+                            <p class="text-sm text-green-600">最长逾期天数: 15天</p>
+                        </div>
+                        <div class="bg-orange-50 p-4 rounded">
+                            <h4 class="font-semibold text-orange-700 mb-2">贸易伙伴评价</h4>
+                            <p class="text-sm text-orange-600">合作伙伴数量: 23家</p>
+                            <p class="text-sm text-orange-600">平均评分: 4.5/5.0</p>
+                            <p class="text-sm text-orange-600">纠纷解决率: 100%</p>
+                        </div>
+                    </div>
+                `);
+            });
+            document.getElementById('viewThirdParty').addEventListener('click', function() {
+                openModal('第三方信用数据', `
+                    <div class="space-y-4">
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <h4 class="font-semibold text-gray-700">海关信用记录</h4>
+                            <p class="text-sm text-gray-600">信用等级: A类企业</p>
+                            <p class="text-sm text-gray-600">认证时间: 2024-06-15</p>
+                            <p class="text-sm text-gray-600">有效期至: 2025-06-14</p>
+                            <p class="text-sm text-gray-600">违规记录: 无</p>
+                        </div>
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-semibold text-gray-700">税务信用记录</h4>
+                            <p class="text-sm text-gray-600">信用等级: B类企业</p>
+                            <p class="text-sm text-gray-600">最近评估: 2024-12-20</p>
+                            <p class="text-sm text-gray-600">欠税记录: 无</p>
+                            <p class="text-sm text-gray-600">处罚记录: 2023年有一次轻微违规</p>
+                        </div>
+                        <div class="border-l-4 border-purple-500 pl-4">
+                            <h4 class="font-semibold text-gray-700">银行信用记录</h4>
+                            <p class="text-sm text-gray-600">合作银行: 3家</p>
+                            <p class="text-sm text-gray-600">贷款记录: 正常</p>
+                            <p class="text-sm text-gray-600">逾期记录: 无</p>
+                            <p class="text-sm text-gray-600">信用额度: 500万元</p>
+                        </div>
+                    </div>
+                `);
+            });
+            document.getElementById('viewBlockchain').addEventListener('click', function() {
+                openModal('区块链存证详情', `
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 p-4 rounded">
+                            <h4 class="font-semibold text-gray-700 mb-2">存证基本信息</h4>
+                            <p class="text-sm text-gray-600">交易哈希: 0x8a3f9b4c2d1e0f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4</p>
+                            <p class="text-sm text-gray-600">区块高度: #1234567</p>
+                            <p class="text-sm text-gray-600">时间戳: 2025-03-28 14:30:25</p>
+                            <p class="text-sm text-gray-600">网络: 以太坊主网</p>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded">
+                            <h4 class="font-semibold text-blue-700 mb-2">存证内容哈希</h4>
+                            <p class="text-sm text-blue-600 break-all">QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco</p>
+                            <p class="text-sm text-gray-600 mt-2">该哈希值包含了完整的信用评估数据，确保数据不可篡改</p>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded">
+                            <h4 class="font-semibold text-green-700 mb-2">验证信息</h4>
+                            <p class="text-sm text-green-600">验证状态: 已验证</p>
+                            <p class="text-sm text-green-600">验证时间: 2025-03-28 14:35:10</p>
+                            <p class="text-sm text-green-600">验证节点: 5个节点确认</p>
+                        </div>
+                    </div>
+                `);
+            });
+            document.getElementById('generateReport').addEventListener('click', function() {
+                openModal('生成信用报告', `
+                    <div class="space-y-4">
+                        <div class="bg-white p-4 rounded-lg border">
+                            <h4 class="font-semibold text-gray-700 mb-3">报告生成选项</h4>
+                            <div class="space-y-3">
+                                <label class="flex items-center">
+                                    <input type="checkbox" class="rounded text-primary" checked>
+                                    <span class="ml-2 text-sm">包含详细评分分析</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" class="rounded text-primary" checked>
+                                    <span class="ml-2 text-sm">包含历史趋势图表</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" class="rounded text-primary">
+                                    <span class="ml-2 text-sm">包含原始数据附件</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" class="rounded text-primary" checked>
+                                    <span class="ml-2 text-sm">包含区块链验证信息</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded">
+                            <h4 class="font-semibold text-blue-700 mb-2">报告格式</h4>
+                            <div class="flex space-x-4">
+                                <label class="flex items-center">
+                                    <input type="radio" name="format" class="text-primary" value="pdf" checked>
+                                    <span class="ml-2 text-sm">PDF文档</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio" name="format" class="text-primary" value="excel">
+                                    <span class="ml-2 text-sm">Excel表格</span>
+                                </label>
+                            </div>
+                        </div>
+                        <button class="w-full bg-primary text-white py-2 px-4 rounded hover:bg-opacity-90 transition">
+                            生成并下载报告
+                        </button>
+                    </div>
+                `);
+            });
+            document.getElementById('submitAppeal').addEventListener('click', function() {
+                openModal('提交异议申诉', `
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">申诉类型</label>
+                            <select class="w-full p-2 border border-gray-300 rounded">
+                                <option>数据准确性异议</option>
+                                <option>评分计算异议</option>
+                                <option>信息更新申请</option>
+                                <option>其他问题</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">申诉说明</label>
+                            <textarea class="w-full p-2 border border-gray-300 rounded" rows="3" placeholder="请详细说明申诉理由和相关证据"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">上传证明文件</label>
+                            <div class="border-2 border-dashed border-gray-300 rounded p-4 text-center">
+                                <p class="text-sm text-gray-500">拖放文件到这里或点击上传</p>
+                                <p class="text-xs text-gray-400 mt-1">支持PDF, JPG, PNG格式，最大10MB</p>
+                            </div>
+                        </div>
+                        <div class="bg-yellow-50 p-3 rounded">
+                            <p class="text-sm text-yellow-700">提交申诉后，我们的审核团队将在3个工作日内处理您的请求。处理期间您的信用评分可能会暂时冻结。</p>
+                        </div>
+                        <button class="w-full bg-primary text-white py-2 px-4 rounded hover:bg-opacity-90 transition">
+                            提交申诉
+                        </button>
+                    </div>
+                `);
+            });
+        });
+    </script>
+ </body>
+</html>import pandas as pd\nimport requests\nimport sqlalchemy as sa\nfrom sqlalchemy.orm import sessionmaker\nfrom sqlalchemy.pool import QueuePool\nimport web3\nfrom web3 import Web3\nfrom web3.middleware import geth_poa_middleware\nfrom web3.contract import Contract\nfrom Crypto.Cipher import AES\nfrom Crypto.Util.Padding import pad, unpad\nimport numpy as np\nfrom sklearn.cluster import KMeans\nfrom functools import lru_cache\nfrom typing import List, Dict, Union, Optional\nimport asyncio\nimport time\nimport hashlib\n\n# 数据库连接池配置\nmysql_engine = sa.create_engine(\n    'mysql+pymysql://root:password@localhost:3306/blockchain_trade',\n    poolclass=QueuePool,\n    pool_size=5,\n    max_overflow=10\n)\n\nmongodb_client = pymongo.MongoClient('mongodb://localhost:27017/')\nmongodb_db = mongodb_client['blockchain_trade
+4. 供应链金融源代码
+<!doctype html>
+<html lang="zh-CN">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>区块链智能贸易信用平台-供应链金融</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://jsd.onmicrosoft.cn/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <script src="https://cdnjs.onmicrosoft.cn/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #D3C3DB 0%, #6366F1 100%);
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      color: #E2E8F0;
+    }
+    .card-glass {
+      background: rgba(24, 18, 36, 0.45);
+      backdrop-filter: blur(8px);
+      border: 1px solid;
+      border-image: linear-gradient(90deg, #D3C3DB, #6366F1) 1;
+      box-shadow:
+        0 1px 8px 0 rgba(99,102,241,0.12),
+        0 0 24px 0 #06B6D4,
+        inset 0 0 16px 0 rgba(99,102,241,0.15);
+      border-radius: 1.5rem;
+      transition: box-shadow 0.3s, transform 0.2s;
+    }
+    .card-glass:hover {
+      box-shadow:
+        0 2px 16px 0 rgba(99,102,241,0.24),
+        0 0 48px 0 #06B6D4,
+        inset 0 0 32px 0 rgba(99,102,241,0.22);
+      transform: translateY(-3px) scale(1.025);
+    }
+    .step-btn {
+      background: linear-gradient(90deg, #D3C3DB, #6366F1);
+      color: #0F172A;
+      font-weight: 600;
+      border-radius: 0.75rem;
+      padding: 0.5rem 1.5rem;
+      box-shadow: 0 1px 8px rgba(99,102,241,0.12);
+      margin-bottom: 1rem;
+      cursor: pointer;
+      transition: background 0.2s, box-shadow 0.2s;
+      border: none;
+    }
+    .step-btn:focus {
+      outline: none;
+      background: linear-gradient(90deg, #6366F1 70%, #D3C3DB);
+      box-shadow: 0 4px 24px #6366F1;
+    }
+    .dialog {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(1);
+      background: rgba(24, 18, 36, 0.97);
+      border: 2px solid #6366F1;
+      border-radius: 1.25rem;
+      box-shadow: 0 4px 32px #06B6D4, 0 0 8px #6366F1 inset;
+      min-width: 380px;
+      max-width: 440px;
+      z-index: 9999;
+      padding: 2rem 2.5rem;
+      animation: dialog-fade 0.35s;
+    }
+    @keyframes dialog-fade {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+      to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+    .dialog-close {
+      float: right;
+      cursor: pointer;
+      font-size: 1.4rem;
+      color: #E2E8F0;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.5rem;
+      background: #6366F1;
+      transition: background 0.18s;
+      margin-top: -1rem;
+      margin-right: -1rem;
+    }
+    .dialog-close:hover {
+      background: #06B6D4;
+    }
+    .card-header {
+      font-size: 1.2rem;
+      font-weight: bold;
+      background: linear-gradient(90deg, #6366F1 50%, #D3C3DB 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.75rem;
+    }
+    .floating-label input:focus ~ label,
+    .floating-label input:not(:placeholder-shown) ~ label {
+      top: -1.25rem;
+      left: 0.15rem;
+      font-size: 0.95rem;
+      color: #6366F1;
+      background: #0F172A;
+      padding: 0 0.25rem;
+      border-radius: 0.25rem;
+      transition: all 0.2s;
+    }
+    .floating-label {
+      position: relative;
+      margin-bottom: 1.25rem;
+    }
+    .floating-label input {
+      background: rgba(44, 34, 54, 0.8);
+      border: 1px solid #6366F1;
+      border-radius: 0.75rem;
+      padding: 1rem 1rem 0.75rem 1rem;
+      color: #E2E8F0;
+      width: 100%;
+      font-size: 1.1rem;
+      outline: none;
+    }
+    .floating-label label {
+      position: absolute;
+      top: 1rem;
+      left: 1.1rem;
+      color: #D3C3DB;
+      font-size: 1.08rem;
+      pointer-events: none;
+      transition: all 0.2s;
+      background: none;
+    }
+    .data-board {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+    @media (max-width: 1200px) {
+      .data-board { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 800px) {
+      .data-board { grid-template-columns: 1fr; }
+    }
+    .draggable {
+      cursor: grab;
+      transition: box-shadow 0.2s;
+    }
+    .draggable:active {
+      cursor: grabbing;
+      box-shadow: 0 8px 32px #6366F1;
+    }
+    .particle-loader {
+      position: relative;
+      width: 64px;
+      height: 64px;
+      margin: 0 auto;
+      margin-bottom: 1rem;
+      z-index: 2;
+    }
+    .particle-dot {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: linear-gradient(135deg, #06B6D4, #6366F1);
+      border-radius: 50%;
+      animation: particle-bounce 1.5s infinite cubic-bezier(.5,1.6,.4,.7);
+    }
+    @keyframes particle-bounce {
+      0%, 100% { transform: scale(1) translateY(0); }
+      50% { transform: scale(1.15) translateY(-18px); }
+    }
+    .particle-dot:nth-child(1) { left: 8px; animation-delay: 0s; }
+    .particle-dot:nth-child(2) { left: 22px; animation-delay: 0.2s; }
+    .particle-dot:nth-child(3) { left: 36px; animation-delay: 0.4s; }
+    .particle-dot:nth-child(4) { left: 50px; animation-delay: 0.6s; }
+    .gsap-flow {
+      width: 95%;
+      height: 62px;
+      margin: 0 auto;
+      position: relative;
+      overflow: visible;
+    }
+    .flow-circle {
+      position: absolute;
+      top: 20px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #D3C3DB 0%, #06B6D4 100%);
+      box-shadow: 0 0 8px #6366F1, 0 0 16px #06B6D4;
+    }
+    .flow-arrow {
+      position: absolute;
+      top: 30px;
+      width: 38px;
+      height: 4px;
+      background: linear-gradient(90deg, #6366F1, #06B6D4);
+      border-radius: 2px;
+      box-shadow: 0 1px 8px #6366F1;
+    }
+    .flow-label {
+      position: absolute;
+      top: 2px;
+      font-size: 0.95rem;
+      color: #E2E8F0;
+      background: rgba(44,34,54,0.76);
+      border-radius: 0.5rem;
+      padding: 0.2rem 0.7rem;
+      font-weight: 500;
+      left: 0;
+    }
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 1.1rem;
+      margin-top: 1.1rem;
+    }
+    .timeline-item {
+      background: rgba(44,34,54,0.80);
+      border-left: 4px solid #6366F1;
+      padding: 0.7rem 1.5rem;
+      border-radius: 0.75rem;
+      position: relative;
+      margin-left: 1.2rem;
+      font-size: 1.08rem;
+    }
+    .timeline-item:before {
+      content: '';
+      position: absolute;
+      left: -1.2rem;
+      top: 1rem;
+      width: 16px;
+      height: 16px;
+      background: linear-gradient(135deg, #D3C3DB, #06B6D4);
+      border-radius: 50%;
+      box-shadow: 0 0 6px #6366F1;
+    }
+    .credit-badge {
+      background: linear-gradient(90deg, #D3C3DB, #6366F1);
+      color: #0F172A;
+      border-radius: 0.5rem;
+      padding: 0.2rem 0.7rem;
+      font-weight: 600;
+      margin-left: 0.4rem;
+      font-size: 0.95rem;
+    }
+    .matrix-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+    .matrix-cell {
+      background: rgba(99,102,241,0.09);
+      border-radius: 1rem;
+      padding: 1rem 1.2rem;
+      box-shadow: 0 1px 8px #6366F1;
+      color: #E2E8F0;
+      font-size: 1.09rem;
+    }
+    .slider {
+      width: 100%;
+      margin-top: 0.6rem;
+      margin-bottom: 1.2rem;
+      accent-color: #06B6D4;
+    }
+    .noti {
+      background: linear-gradient(90deg, #6366F1, #D3C3DB);
+      color: #0F172A;
+      border-radius: 0.7rem;
+      padding: 0.5rem 1.2rem;
+      font-weight: 600;
+      font-size: 1.05rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 8px #6366F1;
+    }
+  </style>
+ </head>
+ <body>
+  <div class="container mx-auto px-6 py-8" style="max-width: 100% !important; padding: 5px !important;">
+   <div class="data-board">
+    <!-- 资产数字化面板 -->
+    <div id="assetPanel" class="card-glass draggable">
+     <div class="card-header">
+      资产数字化面板
+     </div>
+     <div class="particle-loader" id="loader-asset">
+      <div class="particle-dot"></div>
+      <div class="particle-dot"></div>
+      <div class="particle-dot"></div>
+      <div class="particle-dot"></div>
+     </div>
+     <div class="floating-label">
+      <input type="text" id="assetNameInput" placeholder=" " autocomplete="off"> <label for="assetNameInput">资产名称（如应收账款、仓单）</label>
+     </div>
+     <div class="floating-label">
+      <input type="number" id="assetValueInput" placeholder=" " autocomplete="off"> <label for="assetValueInput">资产价值（万元）</label>
+     </div> <button id="btnStep1" class="step-btn w-full">生成链上数字凭证</button>
+     <div id="assetThumb" class="mt-4 text-center">
+      <img src="https://images.pexels.com/photos/14354111/pexels-photo-14354111.jpeg" alt="资产缩略图" class="inline-block rounded-xl shadow-lg" style="width: 90px;">
+      <div class="mt-2 text-xs text-[#E2E8F0]">
+       资产缩略图预览
+      </div>
+     </div>
+     <div id="contractLog" class="mt-3 text-sm text-[#E2E8F0]">
+      <span class="credit-badge">智能合约日志</span>
+      <ul id="contractLogList" class="list-disc ml-6 mt-2">
+       <li>合约初始化成功</li>
+      </ul>
+     </div>
+    </div> <!-- 融资匹配引擎 -->
+    <div id="matchEnginePanel" class="card-glass draggable">
+     <div class="card-header">
+      融资匹配引擎
+     </div>
+     <div id="creditRadar" style="width: 120px; height: 120px; margin: 0 auto;"></div>
+     <div class="mt-2 text-center text-sm text-[#E2E8F0]">
+      企业信用评级仪表盘
+     </div>
+     <div class="matrix-grid mt-3 mb-2">
+      <div class="matrix-cell">
+       保理融资 - <span class="credit-badge">适合高信用企业</span>
+      </div>
+      <div class="matrix-cell">
+       订单融资 - <span class="credit-badge">适合成长型企业</span>
+      </div>
+      <div class="matrix-cell">
+       仓单质押 - <span class="credit-badge">资产丰富企业</span>
+      </div>
+      <div class="matrix-cell">
+       票据贴现 - <span class="credit-badge">流动性需求企业</span>
+      </div>
+     </div>
+     <div class="mt-2 font-medium">
+      风险参数调节
+     </div> <input id="sliderRisk" type="range" min="1" max="100" value="60" class="slider"> <button id="btnStep2" class="step-btn w-full">推荐融资产品</button>
+    </div> <!-- 风险定价看板 -->
+    <div id="pricingPanel" class="card-glass draggable">
+     <div class="card-header">
+      风险定价看板
+     </div>
+     <div id="rateChart" style="width: 100%; height: 80px;"></div>
+     <div class="mt-2 text-center text-sm text-[#E2E8F0]">
+      动态利率曲线
+     </div>
+     <div class="floating-label mt-3">
+      <input type="number" id="collateralInput" placeholder=" " min="0"> <label for="collateralInput">抵押物价值（万元）</label>
+     </div>
+     <div class="mt-2 font-medium">
+      担保系数调节
+     </div> <input id="sliderGuarantee" type="range" min="0.5" max="2" step="0.01" value="1.1" class="slider"> <button id="btnStep3" class="step-btn w-full">利率风险计算</button>
+     <div id="pricingResult" class="mt-3 text-sm text-[#E2E8F0]"></div>
+    </div>
+   </div>
+   <div class="data-board mt-2">
+    <!-- 资金清算系统 -->
+    <div id="settlementPanel" class="card-glass draggable col-span-2">
+     <div class="card-header">
+      资金清算系统
+     </div>
+     <div class="gsap-flow" id="fundFlowAnim">
+      <div class="flow-circle" id="flowCircle1" style="left: 0;"></div>
+      <div class="flow-arrow" style="left: 30px;"></div>
+      <div class="flow-circle" id="flowCircle2" style="left: 68px;"></div>
+      <div class="flow-arrow" style="left: 98px;"></div>
+      <div class="flow-circle" id="flowCircle3" style="left: 136px;"></div>
+      <div class="flow-label" style="left: 0;">
+       企业
+      </div>
+      <div class="flow-label" style="left: 68px;">
+       金融机构
+      </div>
+      <div class="flow-label" style="left: 136px;">
+       清算中心
+      </div>
+     </div> <button id="btnStep4" class="step-btn w-full mt-5">启动自动分账</button>
+     <div class="timeline" id="repayTimeline">
+      <div class="timeline-item">
+       2025-03-01：企业文才世发起还款
+      </div>
+      <div class="timeline-item">
+       2025-03-08：金融机构确认还款到账
+      </div>
+      <div class="timeline-item">
+       2025-03-09：信用档案自动更新
+      </div>
+     </div> <button id="btnStep5" class="step-btn w-full mt-3">查看信用档案更新</button>
+    </div> <!-- 信用档案通知 -->
+    <div id="creditNotiPanel" class="card-glass draggable">
+     <div class="card-header">
+      信用档案通知
+     </div>
+     <div class="noti">
+      企业陆云信用评级提升至A+
+     </div>
+     <div class="noti">
+      企业江姬近期还款无逾期，信用保持稳定
+     </div>
+     <div class="noti">
+      企业郝悦雅获得保理融资额度提升
+     </div> <button id="btnStep6" class="step-btn w-full">推送信用更新</button>
+    </div>
+   </div>
+   <div class="data-board mt-2">
+    <!-- 操作日志看板 -->
+    <div id="logPanel" class="card-glass draggable col-span-3">
+     <div class="card-header">
+      智能合约操作日志
+     </div>
+     <ul id="operationLogs" class="list-disc ml-8 mt-2 text-sm text-[#E2E8F0]">
+      <li>2025-03-28：资产数字化凭证生成成功</li>
+      <li>2025-03-28：融资产品推荐完成</li>
+      <li>2025-03-28：利率风险计算完成</li>
+      <li>2025-03-28：资金自动分账已启动</li>
+     </ul> <button id="btnStep7" class="step-btn w-full mt-2">查看合约操作日志详情</button>
+    </div>
+   </div>
+   <div class="flex flex-row gap-4 mt-6 mb-10">
+    <button id="btnStep8" class="step-btn flex-1">一键执行全流程演示</button>
+   </div> <!-- 对话框部分 -->
+   <div class="dialog" id="dialogStep1">
+    <span class="dialog-close" onclick="closeDialog('dialogStep1')">×</span>
+    <div class="card-header">
+     链上数字凭证生成
+    </div>
+    <div class="mt-3">
+     资产名称：<span id="dialogAssetName"></span>
+    </div>
+    <div>
+     资产价值：<span id="dialogAssetValue"></span> 万元
+    </div>
+    <div class="mt-3">
+     凭证已写入区块链，资产缩略图如下：
+    </div> <img src="https://images.pexels.com/photos/31220975/pexels-photo-31220975.jpeg" alt="资产缩略图" class="rounded-xl shadow-lg mt-2" style="width: 90px;">
+    <div class="mt-4">
+     智能合约交互日志已更新，凭证编号：BC-<span id="dialogAssetId"></span>
+    </div>
+   </div>
+   <div class="dialog" id="dialogStep2">
+    <span class="dialog-close" onclick="closeDialog('dialogStep2')">×</span>
+    <div class="card-header">
+     融资产品推荐
+    </div>
+    <div class="mt-3">
+     企业信用评级：<span id="dialogCreditScore"></span>
+    </div>
+    <div class="mt-2">
+     推荐产品矩阵：
+    </div>
+    <div id="dialogProductMatrix"></div>
+    <div class="mt-3">
+     风险参数已调节，匹配完成。
+    </div>
+   </div>
+   <div class="dialog" id="dialogStep3">
+    <span class="dialog-close" onclick="closeDialog('dialogStep3')">×</span>
+    <div class="card-header">
+     利率风险计算结果
+    </div>
+    <div class="mt-3">
+     抵押物价值：<span id="dialogCollateralValue"></span> 万元
+    </div>
+    <div>
+     担保系数：<span id="dialogGuaranteeCoef"></span>
+    </div>
+    <div class="mt-3">
+     动态利率为：<span id="dialogRateResult"></span> %
+    </div>
+    <div class="mt-2">
+     风险定价模型已完成，利率已同步至融资引擎。
+    </div>
+   </div>
+   <div class="dialog" id="dialogStep4">
+    <span class="dialog-close" onclick="closeDialog('dialogStep4')">×</span>
+    <div class="card-header">
+     资金自动分账流程
+    </div>
+    <div class="mt-3">
+     分账流程已启动，资金已自动流转至各账户：
+    </div>
+    <ul class="list-disc ml-6 mt-2">
+     <li>企业账户：已还款</li>
+     <li>金融机构：资金到账</li>
+     <li>清算中心：分账记录已归档</li>
+    </ul>
+    <div class="mt-4">
+     还款记录已实时同步更新。
+    </div>
+   </div>
+   <div class="dialog" id="dialogStep5">
+    <span class="dialog-close" onclick="closeDialog('dialogStep5')">×</span>
+    <div class="card-header">
+     信用档案更新详情
+    </div>
+    <div class="mt-3">
+     最新还款记录：
+    </div>
+    <div class="timeline">
+     <div class="timeline-item">
+      2025-03-01：企业文才世发起还款
+     </div>
+     <div class="timeline-item">
+      2025-03-08：金融机构确认还款到账
+     </div>
+     <div class="timeline-item">
+      2025-03-09：信用档案自动更新
+     </div>
+    </div>
+    <div class="mt-4">
+     本次还款后，企业信用评级提升。
+    </div>
+   </div>
+   <div class="dialog" id="dialogStep6">
+    <span class="dialog-close" onclick="closeDialog('dialogStep6')">×</span>
+    <div class="card-header">
+     信用档案推送
+    </div>
+    <div class="mt-3">
+     最新信用通知已推送至相关金融机构：
+    </div>
+    <ul class="list-disc ml-6 mt-2">
+     <li>企业陆云信用评级提升至A+</li>
+     <li>企业江姬近期还款无逾期，信用保持稳定</li>
+     <li>企业郝悦雅获得保理融资额度提升</li>
+    </ul>
+    <div class="mt-4">
+     信用档案已同步至链上。
+    </div>
+   </div>
+   <div class="dialog" id="dialogStep7">
+    <span class="dialog-close" onclick="closeDialog('dialogStep7')">×</span>
+    <div class="card-header">
+     合约操作日志详情
+    </div>
+    <ul id="dialogOperationLogs" class="list-disc ml-6 mt-2">
+     <li>资产数字化凭证生成成功</li>
+     <li>融资产品推荐完成</li>
+     <li>利率风险计算完成</li>
+     <li>资金自动分账已启动</li>
+    </ul>
+    <div class="mt-4">
+     所有操作日志均已链上归档。
+    </div>
+   </div>
+   <div class="dialog" id="dialogStep8">
+    <span class="dialog-close" onclick="closeDialog('dialogStep8')">×</span>
+    <div class="card-header">
+     全流程演示
+    </div>
+    <div class="mt-3">
+     系统已自动完成全部核心流程：
+    </div>
+    <ul class="list-disc ml-6 mt-2">
+     <li>资产数字化生成</li>
+     <li>融资产品推荐与风险参数调整</li>
+     <li>动态利率风险定价</li>
+     <li>资金自动分账与还款记录同步</li>
+     <li>信用档案自动更新与推送</li>
+     <li>智能合约操作日志归档</li>
+    </ul>
+    <div class="mt-4">
+     演示流程已全部完成，所有数据实时同步至链上。
+    </div>
+   </div>
+  </div>
+  <script>
+    document.getElementById('btnStep1').onclick = function() {
+      var assetName = document.getElementById('assetNameInput').value || '应收账款';
+      var assetValue = document.getElementById('assetValueInput').value || '100';
+      document.getElementById('dialogAssetName').textContent = assetName;
+      document.getElementById('dialogAssetValue').textContent = assetValue;
+      var id = Math.floor(Math.random()*9000+1000);
+      document.getElementById('dialogAssetId').textContent = id;
+      var logList = document.getElementById('contractLogList');
+      var li = document.createElement('li');
+      li.textContent = '资产数字凭证已生成，编号：BC-' + id;
+      logList.appendChild(li);
+      showDialog('dialogStep1');
+    };
+    document.getElementById('btnStep2').onclick = function() {
+      var risk = document.getElementById('sliderRisk').value;
+      var score = Math.floor(75 + (risk-50)/2);
+      document.getElementById('dialogCreditScore').textContent = score+'分';
+      var matrix = '<div class="matrix-grid mt-2">'+
+        '<div class="matrix-cell">保理融资 - <span class="credit-badge">高信用企业</span></div>'+
+        '<div class="matrix-cell">订单融资 - <span class="credit-badge">成长型企业</span></div>'+
+        '<div class="matrix-cell">仓单质押 - <span class="credit-badge">资产丰富企业</span></div>'+
+        '<div class="matrix-cell">票据贴现 - <span class="credit-badge">流动性需求企业</span></div>'+
+        '</div>';
+      document.getElementById('dialogProductMatrix').innerHTML = matrix;
+      var logList = document.getElementById('operationLogs');
+      var li = document.createElement('li');
+      li.textContent = '融资产品推荐完成，信用评分：'+score+'分';
+      logList.appendChild(li);
+      showDialog('dialogStep2');
+    };
+    document.getElementById('btnStep3').onclick = function() {
+      var collateral = Number(document.getElementById('collateralInput').value) || 120;
+      var guarantee = Number(document.getElementById('sliderGuarantee').value) || 1.1;
+      var baseRate = 6.2;
+      var rate = Math.max(baseRate - Math.log10(collateral) * 2 + (2.2-guarantee)*1.5, 3.5);
+      rate = rate.toFixed(2);
+      document.getElementById('dialogCollateralValue').textContent = collateral;
+      document.getElementById('dialogGuaranteeCoef').textContent = guarantee;
+      document.getElementById('dialogRateResult').textContent = rate;
+      document.getElementById('pricingResult').textContent = '计算后动态利率为：' + rate + '%';
+      var logList = document.getElementById('operationLogs');
+      var li = document.createElement('li');
+      li.textContent = '利率风险计算完成，动态利率：'+rate+'%';
+      logList.appendChild(li);
+      showDialog('dialogStep3');
+      renderRateChart(rate);
+    };
+    document.getElementById('btnStep4').onclick = function() {
+      gsap.to('#flowCircle1', {duration:0.7, x:68, repeat:0, yoyo:false});
+      gsap.to('#flowCircle2', {duration:0.7, x:68, repeat:0, yoyo:false, delay:0.7});
+      gsap.to('#flowCircle3', {duration:0.7, x:0, repeat:0, yoyo:false, delay:1.4});
+      var logList = document.getElementById('operationLogs');
+      var li = document.createElement('li');
+      li.textContent = '资金自动分账已启动';
+      logList.appendChild(li);
+      showDialog('dialogStep4');
+    };
+    document.getElementById('btnStep5').onclick = function() {
+      showDialog('dialogStep5');
+    };
+    document.getElementById('btnStep6').onclick = function() {
+      showDialog('dialogStep6');
+    };
+    document.getElementById('btnStep7').onclick = function() {
+      var logs = Array.from(document.getElementById('operationLogs').children).map(function(el){return el.textContent;});
+      var ul = document.getElementById('dialogOperationLogs');
+      ul.innerHTML = '';
+      logs.forEach(function(txt){
+        var li = document.createElement('li');
+        li.textContent = txt;
+        ul.appendChild(li);
+      });
+      showDialog('dialogStep7');
+    };
+    document.getElementById('btnStep8').onclick = function() {
+      showDialog('dialogStep8');
+    };
+    function showDialog(id){
+      var d = document.getElementById(id);
+      d.style.display = 'block';
+    }
+    function closeDialog(id){
+      var d = document.getElementById(id);
+      d.style.display = 'none';
+    }
+    function renderRadar(){
+      var chart = echarts.init(document.getElementById('creditRadar'));
+      var option = {
+        radar: {
+          indicator: [
+            { name: '信用', max: 100 },
+            { name: '履约', max: 100 },
+            { name: '资产', max: 100 },
+            { name: '流动性', max: 100 },
+            { name: '还款', max: 100 }
+          ],
+          shape: 'polygon',
+          splitNumber: 4,
+          axisName: { color: '#D3C3DB', fontSize:12 },
+          splitArea: {
+            areaStyle: { color: ['rgba(99,102,241,0.09)', 'rgba(99,102,241,0.15)', 'rgba(6,182,212,0.10)'] }
+          },
+          splitLine: { lineStyle: { color: '#6366F1' } },
+          axisLine: { lineStyle: { color: '#06B6D4' } }
+        },
+        series: [{
+          type: 'radar',
+          data: [
+            {
+              value: [86,90,78,82,92],
+              name: '信用评级',
+              areaStyle: { color: 'rgba(99,102,241,0.25)' },
+              lineStyle: { color: '#6366F1' },
+              symbol: 'circle',
+              symbolSize: 6
+            }
+          ]
+        }]
+      };
+      chart.setOption(option);
+      window.addEventListener('resize', chart.resize);
+    }
+    renderRadar();
+    function renderRateChart(rate){
+      var chart = echarts.init(document.getElementById('rateChart'));
+      var base = [6.2,5.7,5.3,5.0,4.8,4.3,rate];
+      var option = {
+        grid: { left: 12, right:12, top:18, bottom:12 },
+        xAxis: { show:false },
+        yAxis: { show:false },
+        series: [{
+          type: 'line',
+          data: base,
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 7,
+          lineStyle: {
+            color: {
+              type:'linear', x:0, y:0, x2:1, y2:0,
+              colorStops:[{offset:0,color:'#D3C3DB'},{offset:1,color:'#6366F1'}]
+            },
+            width:3
+          },
+          itemStyle: { color: '#06B6D4' },
+          areaStyle: {
+            color: {
+              type:'linear', x:0, y:0, x2:0, y2:1,
+              colorStops:[{offset:0,color:'rgba(99,102,241,0.18)'},{offset:1,color:'rgba(6,182,212,0.10)'}]
+            }
+          }
+        }]
+      };
+      chart.setOption(option);
+      window.addEventListener('resize', chart.resize);
+    }
+    renderRateChart(4.8);
+    var draggables = document.querySelectorAll('.draggable');
+    draggables.forEach(function(card){
+      card.onmousedown = function(e){
+        card.style.zIndex = 99;
+        var startX = e.pageX;
+        var startY = e.pageY;
+        var rect = card.getBoundingClientRect();
+        var cardX = rect.left;
+        var cardY = rect.top;
+        function moveCard(ev){
+          card.style.position = 'absolute';
+          card.style.left = (cardX + ev.pageX - startX) + 'px';
+          card.style.top = (cardY + ev.pageY - startY) + 'px';
+        }
+        function upCard(){
+          card.style.zIndex = '';
+          document.removeEventListener('mousemove', moveCard);
+          document.removeEventListener('mouseup', upCard);
+        }
+        document.addEventListener('mousemove', moveCard);
+        document.addEventListener('mouseup', upCard);
+      };
+    });
+    var dots = document.querySelectorAll('.particle-dot');
+    dots.forEach(function(dot, idx){
+      dot.style.animationDelay = (idx * 0.2) + 's';
+    });
+  </script>
+ </body>
+</html>python
+import asyncio
+import decimal
+import hashlib
+import json
+import time
+from collections import deque
+from decimal import Decimal
+from web3 import Web3
+from web3.middleware import construct_sign_and_send_raw_middleware
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from aiohttp import ClientSession
+    def __init__(self):
+        self.history_interest_rate = deque(maxlen = 100) # 滑动窗口缓存历史利率数据
+    def save_interest_rate(self, rate):
+        self.history_interest_rate.append(rate)
+    def get_average_interest_rate(self):
+        return sum(self.history_interest_rate) / len(self.history_interest_rate) if self.history_interest_rate else Decimal('0')
+    def get_offchain_data(self, entity):
+        return {'industry_risk': Decimal('0.1'), 'transaction_frequency': 10, 'collateral_liquidity': Decimal('1000')}
+    def __init__(self, data_layer):
+        self.data_layer = data_layer
+    def create_receivable_digital_certificate(self, original_hash, core_enterprise_signature, due_date, splittable):
+        if not isinstance(original_hash, str) or len(original_hash) != 64:
+            raise ValueError('Invalid original hash')
+        if not isinstance(core_enterprise_signature, str) or len(core_enterprise_signature) != 128:
+            raise ValueError('Invalid core enterprise signature')
+        if not isinstance(due_date, str) or len(due_date) != 10:
+            raise ValueError('Invalid due date')
+        if not isinstance(splittable, bool):
+            raise ValueError('Invalid splittable flag')
+        return {
+            'original_hash': original_hash,
+            'core_enterprise_signature': core_enterprise_signature,
+            'due_date': due_date,
+            'splittable': splittable
+        }
+    def verify_guarantee_penetration(self, suppliers):
+        # 多级供应商担保穿透验证
+        for supplier in suppliers:
+            if not supplier.get('guarantee'):
+                return False
+        return True
+    def calculate_risk_price(self, factors):
+        # 风险定价，包含5个以上动态因子
+        industry_risk = factors.get('industry_risk', Decimal('0'))
+        transaction_frequency = factors.get('transaction_frequency', 0)
+        collateral_liquidity = factors.get('collateral_liquidity', Decimal('0'))
+        market_volatility = factors.get('market_volatility', Decimal('0'))
+        credit_score = factors.get('credit_score', Decimal('0'))
+        risk_price = industry_risk * Decimal('0.4') + Decimal(transaction_frequency) * Decimal('0.2') + collateral_liquidity * Decimal('0.2') + market_volatility * Decimal('0.1') + credit_score * Decimal('0.1')
+        return risk_price
+    def get_market_factors(self, entity):
+        offchain_data = self.data_layer.get_offchain_data(entity)
+        offchain_data['market_volatility'] = market_volatility
+        offchain_data['credit_score'] = credit_score
+        return offchain_data
+    def __init__(self, web3, account, multisig_wallet_address):
+        self.web3 = web3
+        self.account = account
+        self.multisig_wallet_address = multisig_wallet_address
+        self.web3.middleware_onion.add(construct_sign_and_send_raw_middleware(self.account))
+    async def deploy_contract(self, contract_abi, contract_bytecode):
+        Contract = self.web3.eth.contract(abi = contract_abi, bytecode = contract_bytecode)
+        tx_hash = Contract.constructor().transact()
+        tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        contract_address = tx_receipt['contractAddress']
+        return contract_address
+    async def call_contract_function(self, contract_address, function_name, *args, gas_price_strategy = None):
+        contract = self.web3.eth.contract(address = contract_address, abi = self.get_contract_abi(contract_address))
+        function = contract.functions[function_name](*args)
+        if gas_price_strategy:
+            gas_price = gas_price_strategy(self.web3, function)
+        else:
+            gas_price = self.web3.eth.gas_price
+        tx_hash = function.transact({'gasPrice': gas_price})
+        tx_receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        return tx_receipt
+    def get_contract_abi(self, contract_address):
+        return []
+    def gas_optimize(self, function):
+        def wrapper(self, *args, **kwargs):
+            gas_price = self.web3.eth.gas_price * Decimal('0.9')
+            kwargs['gasPrice'] = int(gas_price)
+            return function(self, *args, **kwargs)
+        return wrapper
+    def handle_transaction_rollback(self, function):
+        def wrapper(self, *args, **kwargs):
+            try:
+                return function(self, *args, **kwargs)
+            except Exception as e:
+                print(f'Transaction rollback due to {e}')
+                # 这里可以添加实际的回滚逻辑，如撤销已做的部分操作
+                return None
+        return wrapper
+# 信用评估引擎
+class CreditEvaluationEngine:
+    def __init__(self):
+        self.model = LinearRegression()
+    def train_model(self, X, y):
+        self.model.fit(X, y)
+    def evaluate_credit(self, features):
+        return self.model.predict([features])[0]
+# 资产登记存证系统
+class AssetRegistrationSystem:
+    def __init__(self, ipfs_client):
+        self.ipfs_client = ipfs_client
+    def register_asset(self, asset_data):
+        data_hash = hashlib.sha256(json.dumps(asset_data).encode()).hexdigest()
+        ipfs_hash = self.ipfs_client.add_json(asset_data)
+        return data_hash, ipfs_hash
+# 动态利率计算模型
+class DynamicInterestRateModel:
+    def __init__(self, data_layer):
+        self.data_layer = data_layer
+    def calculate_interest_rate(self, market_factors):
+        # 基于市场指标加权计算利率
+        average_rate = self.data_layer.get_average_interest_rate()
+        industry_risk = market_factors.get('industry_risk', Decimal('0'))
+        new_rate = average_rate + industry_risk * Decimal('0.05')
+        return new_rate
+# 默克尔树相关实现
+class MerkleTree:
+    def __init__(self, data):
+        self.data = [hashlib.sha256(str(d).encode()).hexdigest() for d in data]
+        self.build_tree()
+    def build_tree(self):
+        nodes = self.data.copy()
+        while len(nodes) > 1:
+            new_nodes = []
+            for i in range(0, len(nodes), 2):
+                left = nodes[i]
+                right = nodes[i + 1] if i + 1 < len(nodes) else left
+                new_nodes.append(hashlib.sha256((left + right).encode()).hexdigest())
+            nodes = new_nodes
+        self.root = nodes[0]
+    def get_proof(self, index):
+        proof = []
+        nodes = self.data.copy()
+        while len(nodes) > 1:
+            new_nodes = []
+            for i in range(0, len(nodes), 2):
+                left = nodes[i]
+                right = nodes[i + 1] if i + 1 < len(nodes) else left
+                if i // 2 * 2 != i:
+                    proof.append(left)
+                else:
+                    proof.append(right)
+                new_nodes.append(hashlib.sha256((left + right).encode()).hexdigest())
+            nodes = new_nodes
+        return proof
+# 工厂模式构建金融产品对象
+class FinancialProductFactory:
+    def create_product(self, product_type, *args, **kwargs):
+        if product_type =='receivable':
+            return self.create_receivable(*args, **kwargs)
+        elif product_type == 'loan':
+            return self.create_loan(*args, **kwargs)
+        else:
+            raise ValueError('Invalid product type')
+    def create_receivable(self, original_hash, core_enterprise_signature, due_date, splittable):
+        return {'type':'receivable', 'original_hash': original_hash, 'core_enterprise_signature': core_enterprise_signature, 'due_date': due_date,'splittable': splittable}
+    def create_loan(self, amount, interest_rate, term):
+        return {'type': 'loan', 'amount': amount, 'interest_rate': interest_rate, 'term': term}
+# 主业务流程
+async def main():
+    account = w3.eth.account.from_key('0x1234567890123456789012345678901234567890123456789012345678901234')
+    multisig_wallet_address = '0x9876543210987654321098765432109876543210'
+    credit_engine = CreditEvaluationEngine()
+    ipfs_client = None # 实际需要初始化IPFS客户端
+    asset_registration = AssetRegistrationSystem(ipfs_client)
+    interest_rate_model = DynamicInterestRateModel(data_layer)
+    product_factory = FinancialProductFactory()
+    # 贸易资产注册
+    original_hash = '0x' + hashlib.sha256('original_bill'.encode()).hexdigest()
+    core_enterprise_signature = '0x' + hashlib.sha256('core_enterprise_sign'.encode()).hexdigest()
+    due_date = '2024 - 12 - 31'
+    splittable = True
+    receivable = product_factory.create_product('receivable', original_hash, core_enterprise_signature, due_date, splittable)
+    data_hash, ipfs_hash = asset_registration.register_asset(receivable)
+    # 融资申请
+    suppliers = [{'name':'supplier1', 'guarantee': True}, {'name':'supplier2', 'guarantee': True}]
+    if not business_layer.verify_guarantee_penetration(suppliers):
+        print('Guarantee penetration verification failed')
+        return
+    # 风险评估
+    market_factors = business_layer.get_market_factors('applicant')
+    risk_price = business_layer.calculate_risk_price(market_factors)
+    credit_score = credit_engine.evaluate_credit(np.array(list(market_factors.values())).reshape(1, -1))
+    # 合约执行
+    contract_abi = []
+    contract_bytecode = '0x1234567890'
+    contract_address = await contract_layer.deploy_contract(contract_abi, contract_bytecode)
+    # 资金清算
+    async with ClientSession() as session:
+        async with session.post('http://clearinghouse.com/settle', json = {'amount': Decimal('100'), 'parties': ['party1', 'party2']}) as response:
+            result = await response.json()
+    offchain_data = data_layer.get_offchain_data('applicant')
+    # 多签钱包资金监管逻辑
+    multisig_balance = w3.eth.get_balance(multisig_wallet_address)
+    # EIP - 1559交易费用机制处理
+    def eip1559_gas_price_strategy(web3, transaction):
+        base_fee = web3.eth.get_block('latest')['baseFeePerGas']
+        priority_fee = web3.eth.max_priority_fee_per_gas
+        return base_fee + priority_fee
+    await contract_layer.call_contract_function(contract_address,'settle_funds', Decimal('100'), gas_price_strategy = eip1559_gas_price_strategy)
+if __name__ == '__main__':
+    asyncio.run(main())
+5. 系统管理源代码
+<!doctype html>
+<html lang="zh-CN">
+ <head>
+  <meta charset="UTF-8">
+  <title>区块链智能贸易信用平台 - 系统管理</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://jsd.onmicrosoft.cn/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <link href="https://fonts.googleapis.com/css?family=Inter:400,500,600,700&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background: linear-gradient(135deg, #D3C3DB 0%, #9F7AEA 100%) no-repeat center center fixed;
+      min-height: 100vh;
+      color: #2D3748;
+    }
+    .card {
+      background: rgba(243, 242, 248, 0.85);
+      border: 1px solid #E2E8F0;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.10);
+      border-radius: 14px;
+      backdrop-filter: blur(8px);
+      margin-bottom: 2rem;
+      transition: box-shadow 0.2s;
+    }
+    .card:hover {
+      box-shadow: 0 8px 16px -4px rgba(100, 72, 160, 0.14);
+    }
+    .btn {
+      font-family: 'Inter', Arial, sans-serif;
+      font-weight: 500;
+      background: linear-gradient(90deg,#D3C3DB 0%,#9F7AEA 100%);
+      color: #2D3748;
+      border-radius: 8px;
+      padding: 0.5rem 1.5rem;
+      box-shadow: 0 2px 4px -2px rgba(0,0,0,0.06);
+      border: none;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .btn:hover, .btn:focus {
+      background: linear-gradient(90deg,#BCA4C8 0%,#7D5EA8 100%);
+      transform: translateY(-2px) scale(1.03);
+      outline: none;
+    }
+    .form-input:focus {
+      border-image: linear-gradient(90deg, #D3C3DB, #9F7AEA) 1;
+      transition: border-image 0.3s;
+      box-shadow: 0 0 0 2px #D3C3DB44;
+    }
+    .table-row:hover {
+      background: #F8FAFC;
+      transition: background 0.15s;
+    }
+    .material-icons {
+      vertical-align: middle;
+      font-size: 20px;
+      color: #A8B0C1;
+    }
+    .status-success { color: #38A169; }
+    .status-warning { color: #ECC94B; }
+    .status-error { color: #E53E3E; }
+    .dialog {
+      z-index: 1002;
+      background: rgba(255,255,255,0.97);
+      border-radius: 12px;
+      box-shadow: 0 6px 18px -4px rgba(44, 34, 84, 0.18);
+      border: 1px solid #E2E8F0;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      min-width: 380px;
+      max-width: 90vw;
+      display: none;
+      padding: 32px 24px 24px 24px;
+    }
+    .dialog.show {
+      display: block;
+      animation: fadeInDialog 0.28s;
+    }
+    @keyframes fadeInDialog {
+      0% { opacity: 0; transform: translate(-50%,-60%); }
+      100% { opacity: 1; transform: translate(-50%,-50%); }
+    }
+    .dialog-header {
+      font-weight: 600;
+      font-size: 18px;
+      margin-bottom: 14px;
+      color: #2E3A59;
+    }
+    .dialog-content {
+      font-size: 15px;
+      color: #2D3748;
+      margin-bottom: 18px;
+    }
+    .dialog-close {
+      position: absolute;
+      right: 18px;
+      top: 16px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #A8B0C1;
+      font-size: 22px;
+    }
+    .dialog-action {
+      margin-top: 12px;
+      text-align: right;
+    }
+    .dialog-action .btn {
+      margin-left: 8px;
+    }
+    .audit-log {
+      font-family: 'Monospace', monospace;
+      font-size: 13px;
+      background: #F3F0FA;
+      border-radius: 6px;
+      padding: 10px 18px;
+      margin-bottom: 8px;
+      color: #718096;
+      border: 1px solid #E2E8F0;
+    }
+    .timeline {
+      border-left: 2px solid #A8B0C1;
+      margin-left: 12px;
+      padding-left: 16px;
+      position: relative;
+    }
+    .timeline-event {
+      position: relative;
+      margin-bottom: 24px;
+      padding-left: 8px;
+    }
+    .timeline-event:before {
+      content: '';
+      position: absolute;
+      left: -21px;
+      top: 3px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: linear-gradient(135deg,#D3C3DB,#9F7AEA);
+      border: 2px solid #E2E8F0;
+    }
+    .timeline-time {
+      font-size: 12px;
+      color: #A8B0C1;
+      margin-bottom: 2px;
+      margin-left: 3px;
+    }
+    .timeline-content {
+      font-size: 14px;
+      color: #2D3748;
+    }
+    .org-tree {
+      min-height: 140px;
+      margin-bottom: 18px;
+      background: url('https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=900&q=80') center/cover no-repeat;
+      border-radius: 12px;
+      border: 1px solid #E2E8F0;
+      box-shadow: 0 2px 8px -2px rgba(0,0,0,0.06);
+      position: relative;
+    }
+    .org-tree-content {
+      backdrop-filter: blur(3px);
+      background: rgba(243,242,248,0.6);
+      border-radius: 12px;
+      padding: 18px 28px;
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+    }
+    .matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      margin-bottom: 16px;
+    }
+    .matrix-table th, .matrix-table td {
+      border: 1px solid #E2E8F0;
+      padding: 8px 10px;
+      text-align: center;
+      font-size: 14px;
+    }
+    .matrix-table th {
+      background: linear-gradient(90deg,#D3C3DB 0%,#A8B0C1 100%);
+      color: #2E3A59;
+      font-weight: 500;
+    }
+    .matrix-table td {
+      background: #F8FAFC;
+      color: #2D3748;
+    }
+    .sso-config-form .form-input {
+      width: 100%;
+      padding: 7px 12px;
+      border-radius: 6px;
+      border: 1px solid #A8B0C1;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .sso-config-form label {
+      font-size: 13px;
+      color: #718096;
+      margin-bottom: 3px;
+      display: block;
+    }
+    .sso-config-form .btn {
+      margin-top: 6px;
+    }
+    .dashboard-img {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #E2E8F0;
+    }
+    .slider {
+      width: 100%;
+      margin: 8px 0;
+    }
+    .storage-group {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .storage-option {
+      padding: 10px 24px;
+      border-radius: 8px;
+      border: 1px solid #A8B0C1;
+      background: #F8FAFC;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .storage-option.selected {
+      background: linear-gradient(90deg,#D3C3DB 40%,#A8B0C1 100%);
+      border-color: #9F7AEA;
+      color: #2E3A59;
+    }
+    .echart-container {
+      min-height: 220px;
+      width: 100%;
+      background: #F8FAFC;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      border: 1px solid #E2E8F0;
+      box-shadow: 0 2px 8px -2px rgba(0,0,0,0.06);
+    }
+    .notify-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .notify-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #E2E8F0;
+      font-size: 15px;
+      color: #2D3748;
+    }
+    .notify-item:last-child {
+      border-bottom: none;
+    }
+    .notify-icon {
+      margin-right: 10px;
+      font-size: 20px;
+    }
+    .audit-log-list {
+      margin-top: 10px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .audit-log {
+      background: #F3F0FA;
+      margin-bottom: 4px;
+      border-radius: 6px;
+      padding: 8px 14px;
+      border: 1px solid #E2E8F0;
+      color: #718096;
+      font-size: 13px;
+      font-family: 'Monospace', monospace;
+    }
+  </style>
+ </head>
+ <body>
+  <div class="max-w-6xl mx-auto py-10 px-4">
+   <div class="mb-8">
+    <h1 class="text-2xl font-semibold" style="font-family:Inter,Arial,sans-serif; color:#2E3A59;">区块链智能贸易信用平台 - 系统管理</h1>
+    <p class="mt-2 text-base text-gray-600" style="color:#718096;">平台级配置管理中心，保障系统透明性与可审计性。</p>
+   </div> <!-- 组织架构管理 -->
+   <div class="card p-6">
+    <div class="flex items-center mb-5">
+     <span class="material-icons mr-2" style="color:#9F7AEA;">account_tree</span> <span class="text-lg font-medium" style="color:#2E3A59;">组织架构管理</span>
+    </div>
+    <div class="org-tree">
+     <div class="org-tree-content">
+      <div class="flex gap-8">
+       <div>
+        <div class="font-semibold" style="color:#2D3748;">
+         监管机构
+        </div>
+        <div class="text-sm text-gray-500">
+         角色：审批/监管
+        </div>
+        <div class="mt-1 text-xs text-gray-400">
+         成员：陆霄，钟雅梦
+        </div>
+       </div>
+       <div>
+        <div class="font-semibold" style="color:#2D3748;">
+         核心企业
+        </div>
+        <div class="text-sm text-gray-500">
+         角色：发起/签约/支付
+        </div>
+        <div class="mt-1 text-xs text-gray-400">
+         成员：杜盛，常红珍
+        </div>
+       </div>
+       <div>
+        <div class="font-semibold" style="color:#2D3748;">
+         物流方
+        </div>
+        <div class="text-sm text-gray-500">
+         角色：运输/交付
+        </div>
+        <div class="mt-1 text-xs text-gray-400">
+         成员：彭政
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+    <div class="mt-4">
+     <span class="text-base font-medium" style="color:#2E3A59;">角色权限矩阵</span>
+     <table class="matrix-table">
+      <thead>
+       <tr>
+        <th>角色</th>
+        <th>审批</th>
+        <th>发起交易</th>
+        <th>签约</th>
+        <th>支付</th>
+        <th>运输</th>
+        <th>交付</th>
+       </tr>
+      </thead>
+      <tbody>
+       <tr class="table-row">
+        <td>监管机构</td>
+        <td><span class="material-icons status-success">check_circle</span></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+       </tr>
+       <tr class="table-row">
+        <td>核心企业</td>
+        <td></td>
+        <td><span class="material-icons status-success">check_circle</span></td>
+        <td><span class="material-icons status-success">check_circle</span></td>
+        <td><span class="material-icons status-success">check_circle</span></td>
+        <td></td>
+        <td></td>
+       </tr>
+       <tr class="table-row">
+        <td>物流方</td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td><span class="material-icons status-success">check_circle</span></td>
+        <td><span class="material-icons status-success">check_circle</span></td>
+       </tr>
+      </tbody>
+     </table>
+    </div>
+    <div class="mt-4">
+     <span class="text-base font-medium" style="color:#2E3A59;">SSO集成配置</span>
+     <form class="sso-config-form grid grid-cols-2 gap-6 mt-3">
+      <div>
+       <label for="saml-url">SAML元数据地址</label> <input id="saml-url" type="url" class="form-input" placeholder="输入SAML元数据URL">
+      </div>
+      <div>
+       <label for="oauth-client">OAuth2.0 Client ID</label> <input id="oauth-client" type="text" class="form-input" placeholder="输入Client ID">
+      </div>
+     </form>
+     <div class="flex gap-3 mt-2">
+      <button id="step1" type="button" class="btn">保存并提交审批</button> <button id="step2" type="button" class="btn">查看审批流程</button>
+     </div>
+    </div>
+   </div> <!-- 区块链网络配置管理 -->
+   <div class="card p-6">
+    <div class="flex items-center mb-5">
+     <span class="material-icons mr-2" style="color:#9F7AEA;">dns</span> <span class="text-lg font-medium" style="color:#2E3A59;">区块链网络配置</span>
+    </div>
+    </div>
+    </div>
+    </li>
+    </li>
+    </html>
+    </body>
